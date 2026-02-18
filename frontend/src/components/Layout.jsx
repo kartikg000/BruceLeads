@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Mail, Send, Settings, Database, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Mail, Send, Settings, Database } from 'lucide-react'
 import clsx from 'clsx'
 
 const NAV_ITEMS = [
@@ -11,7 +11,7 @@ const NAV_ITEMS = [
     { label: 'Outbox', icon: Send, path: '/outbox' },
 ]
 
-export default function Layout({ children, user, onLogout }) {
+export default function Layout({ children }) {
     const location = useLocation()
 
     return (
@@ -35,30 +35,9 @@ export default function Layout({ children, user, onLogout }) {
                     ))}
                 </nav>
 
-                {/* Bottom: User profile + Settings */}
+                {/* Bottom: Settings */}
                 <div className="mt-auto">
-                    {user && (
-                        <div className="px-4 pb-2">
-                            <div className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl">
-                                {user.picture ? (
-                                    <img src={user.picture} alt="" className="w-8 h-8 rounded-full flex-shrink-0" referrerPolicy="no-referrer" />
-                                ) : (
-                                    <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                                        {(user.name || user.email || '?')[0].toUpperCase()}
-                                    </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-white truncate">{user.name || 'User'}</p>
-                                    <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
-                                </div>
-                                <button onClick={onLogout} title="Sign out"
-                                    className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0">
-                                    <LogOut size={15} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                    <div className="p-4 pt-0">
+                    <div className="p-4">
                         <Link to="/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/50 transition-all">
                             <Settings size={20} />
                             <span className="text-sm font-medium">Settings</span>

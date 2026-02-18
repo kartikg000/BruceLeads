@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import SetupWizard from './components/SetupWizard'
-import LoginScreen from './components/LoginScreen'
 import ErrorBoundary from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import FindLeads from './pages/FindLeads'
@@ -28,61 +27,18 @@ function LoadingScreen() {
 }
 
 export default function App() {
-    const [authChecked, setAuthChecked] = useState(false)
-    const [isLoggedIn, setIsLoggedIn] = useState(false)
-    const [user, setUser] = useState(null)
     const [setupChecked, setSetupChecked] = useState(false)
     const [needsSetup, setNeedsSetup] = useState(false)
 
-    const checkAuth = () => {
-        const token = localStorage.getItem('bruce_token') || ''
-        axios.get('/api/auth/me', { params: { token } })
-            .then(res => {
-                setIsLoggedIn(res.data.authenticated)
-                if (res.data.authenticated) setUser(res.data.user)
-                setAuthChecked(true)
-            })
-            .catch(() => setAuthChecked(true))
-    }
-
     useEffect(() => {
-        // Handle OAuth callback token in URL
-        const params = new URLSearchParams(window.location.search)
-        const authToken = params.get('auth_token')
-        const authError = params.get('auth_error')
-        if (authToken) {
-            localStorage.setItem('bruce_token', authToken)
-            window.history.replaceState({}, '', '/')
-        }
-        if (authError) {
-            console.error('Auth error:', authError)
-            window.history.replaceState({}, '', '/')
-        }
-        checkAuth()
+        axios.get('/api/setup/status')
+            .then(res => {
+                setNeedsSetup(!res.data.setup_complete)
+                setSetupChecked(true)
+            })
+            .catch(() => setSetupChecked(true))
     }, [])
 
-    // Check setup status after login
-    useEffect(() => {
-        if (isLoggedIn && !setupChecked) {
-            axios.get('/api/setup/status')
-                .then(res => {
-                    setNeedsSetup(!res.data.setup_complete)
-                    setSetupChecked(true)
-                })
-                .catch(() => setSetupChecked(true))
-        }
-    }, [isLoggedIn])
-
-    const handleLogout = async () => {
-        await axios.post('/api/auth/logout').catch(() => { })
-        localStorage.removeItem('bruce_token')
-        setIsLoggedIn(false)
-        setUser(null)
-        setSetupChecked(false)
-    }
-
-    if (!authChecked) return <LoadingScreen />
-    if (!isLoggedIn) return <LoginScreen onLogin={() => checkAuth()} />
     if (!setupChecked) return <LoadingScreen />
 
     if (needsSetup) {
@@ -97,7 +53,7 @@ export default function App() {
         <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
                 <Router>
-                    <Layout user={user} onLogout={handleLogout}>
+                    <Layout>
                         <Routes>
                             <Route path="/" element={<Dashboard />} />
                             <Route path="/find" element={<FindLeads />} />

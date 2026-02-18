@@ -8,30 +8,22 @@ const STEPS = [
     { id: 'welcome', label: 'Welcome' },
     { id: 'browser', label: 'Browser' },
     { id: 'gemini', label: 'AI Setup' },
-    { id: 'gmail', label: 'Email Setup' },
     { id: 'done', label: 'Complete' },
 ]
 
 export default function SetupWizard({ onComplete }) {
     const [step, setStep] = useState(0)
     const [geminiKey, setGeminiKey] = useState('')
-    const [gmailEmail, setGmailEmail] = useState('')
-    const [gmailPassword, setGmailPassword] = useState('')
-    const [oauthFile, setOauthFile] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
     const [geminiSaved, setGeminiSaved] = useState(false)
-    const [gmailConfigured, setGmailConfigured] = useState(false)
-    const [playwrightInstalled, setPlaywrightInstalled] = useState(null) // null = checking
+    const [playwrightInstalled, setPlaywrightInstalled] = useState(null)
     const [installingPlaywright, setInstallingPlaywright] = useState(false)
-    const fileInputRef = useRef(null)
 
     const currentStep = STEPS[step]
-
     const clearMessages = () => { setError(''); setSuccess('') }
 
-    // Check Playwright status on mount
     useEffect(() => {
         axios.get('/api/setup/playwright-status')
             .then(res => setPlaywrightInstalled(res.data.chromium_installed))
@@ -56,41 +48,11 @@ export default function SetupWizard({ onComplete }) {
     }
 
     const handleSaveGmailSMTP = async () => {
-        if (!gmailEmail.trim() || !gmailPassword.trim()) {
-            setError('Email and app password are required'); return
-        }
-        setLoading(true); clearMessages()
-        try {
-            const res = await axios.post('/api/setup/gmail-smtp', {
-                email: gmailEmail.trim(),
-                app_password: gmailPassword.trim(),
-            })
-            if (res.data.success) {
-                setGmailConfigured(true)
-                setSuccess('Gmail SMTP credentials saved!')
-            }
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to save Gmail credentials')
-        }
-        setLoading(false)
+        // Removed — Gmail setup moved to Settings page
     }
 
     const handleUploadOAuth = async () => {
-        if (!oauthFile) { setError('Please select a credentials JSON file'); return }
-        setLoading(true); clearMessages()
-        try {
-            const formData = new FormData()
-            formData.append('file', oauthFile)
-            const res = await axios.post('/api/setup/gmail-upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            })
-            if (res.data.success) {
-                setSuccess('OAuth credentials uploaded! You can connect Gmail later in Settings.')
-            }
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to upload credentials')
-        }
-        setLoading(false)
+        // Removed — Gmail OAuth setup moved to Settings page
     }
 
     const handleInstallPlaywright = async () => {
@@ -284,81 +246,6 @@ export default function SetupWizard({ onComplete }) {
                             </StepContainer>
                         )}
 
-                        {currentStep.id === 'gmail' && (
-                            <StepContainer key="gmail">
-                                <div className="space-y-6">
-                                    <div>
-                                        <h2 className="text-2xl font-bold flex items-center gap-3">
-                                            <Mail size={24} /> Email Setup
-                                        </h2>
-                                        <p className="text-zinc-400 mt-1">Connect Gmail to send emails and create drafts.</p>
-                                    </div>
-
-                                    {/* SMTP Option */}
-                                    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-5 space-y-4">
-                                        <h3 className="font-semibold text-sm uppercase tracking-wider text-zinc-300">Option 1: Gmail App Password (Easiest)</h3>
-                                        <div className="space-y-3">
-                                            <input type="email" value={gmailEmail} onChange={e => setGmailEmail(e.target.value)}
-                                                placeholder="your.email@gmail.com"
-                                                className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
-                                                disabled={gmailConfigured} />
-                                            <input type="password" value={gmailPassword} onChange={e => setGmailPassword(e.target.value)}
-                                                placeholder="App password (16 chars)"
-                                                className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
-                                                disabled={gmailConfigured} />
-                                        </div>
-                                        <p className="text-xs text-zinc-500">
-                                            Create an app password at{' '}
-                                            <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer"
-                                                className="text-blue-400 hover:underline">myaccount.google.com/apppasswords</a>
-                                        </p>
-                                        {!gmailConfigured && (
-                                            <button onClick={handleSaveGmailSMTP} disabled={loading}
-                                                className="px-5 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium">
-                                                {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                                                Save SMTP Credentials
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* OAuth Option */}
-                                    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-5 space-y-4">
-                                        <h3 className="font-semibold text-sm uppercase tracking-wider text-zinc-300">Option 2: Gmail OAuth (Advanced — for drafts)</h3>
-                                        <p className="text-xs text-zinc-500">Upload your Google Cloud OAuth credentials JSON to enable creating drafts directly in Gmail.</p>
-                                        <div className="flex items-center gap-3">
-                                            <input ref={fileInputRef} type="file" accept=".json" className="hidden"
-                                                onChange={e => setOauthFile(e.target.files?.[0] || null)} />
-                                            <button onClick={() => fileInputRef.current?.click()}
-                                                className="px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-300 hover:border-zinc-500 transition-colors flex items-center gap-2">
-                                                <Upload size={14} /> {oauthFile ? oauthFile.name : 'Choose JSON File'}
-                                            </button>
-                                            {oauthFile && (
-                                                <button onClick={handleUploadOAuth} disabled={loading}
-                                                    className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg hover:bg-purple-500/30 transition-colors text-sm font-medium disabled:opacity-50">
-                                                    {loading ? <Loader2 size={14} className="animate-spin" /> : 'Upload'}
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <MessageDisplay error={error} success={success} />
-
-                                    <div className="flex justify-between pt-2">
-                                        <button onClick={prevStep} className="px-4 py-2 text-zinc-400 hover:text-white flex items-center gap-1">
-                                            <ArrowLeft size={16} /> Back
-                                        </button>
-                                        <button onClick={nextStep}
-                                            className={clsx(
-                                                "px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-colors",
-                                                gmailConfigured ? "bg-white text-black hover:bg-zinc-200" : "bg-zinc-800 text-zinc-400 hover:text-white"
-                                            )}>
-                                            {gmailConfigured ? 'Continue' : 'Skip for now'} <ArrowRight size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            </StepContainer>
-                        )}
-
                         {currentStep.id === 'done' && (
                             <StepContainer key="done">
                                 <div className="text-center space-y-6">
@@ -367,13 +254,12 @@ export default function SetupWizard({ onComplete }) {
                                     </div>
                                     <div>
                                         <h2 className="text-3xl font-bold">You're All Set!</h2>
-                                        <p className="text-zinc-400 mt-2">BruceLeads is ready. You can always update settings later.</p>
+                                        <p className="text-zinc-400 mt-2">BruceLeads is ready. Configure email sending in Settings anytime.</p>
                                     </div>
                                     <div className="space-y-2 text-sm text-left bg-zinc-800/50 rounded-xl p-4 max-w-sm mx-auto">
                                         <StatusRow label="Chromium Browser" ok={playwrightInstalled} />
                                         <StatusRow label="Gemini AI" ok={geminiSaved} />
-                                        <StatusRow label="Gmail SMTP" ok={gmailConfigured} />
-                                        <StatusRow label="Gmail OAuth" ok={!!oauthFile} optional />
+                                        <StatusRow label="Gmail / Email" ok={false} optional />
                                     </div>
                                     <button onClick={handleComplete} disabled={loading}
                                         className="px-8 py-3 bg-white text-black font-semibold rounded-xl hover:bg-zinc-200 transition-colors flex items-center gap-2 mx-auto disabled:opacity-50">
