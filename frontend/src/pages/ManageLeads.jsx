@@ -28,8 +28,8 @@ export default function ManageLeads() {
     const { data: allLeads = [], isLoading, refetch } = useQuery({
         queryKey: ['leads'],
         queryFn: async () => {
-            const res = await axios.get('/api/leads')
-            return res.data
+            const res = await axios.get('/api/leads/')
+            return Array.isArray(res.data) ? res.data : []
         }
     })
 

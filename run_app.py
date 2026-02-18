@@ -51,6 +51,7 @@ def mount_static_frontend(app):
     """Mount the built React frontend for production/EXE mode."""
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 
     base = get_base_dir()
     dist_dir = base / "frontend" / "dist"
@@ -66,19 +67,21 @@ def mount_static_frontend(app):
         app.mount("/assets", StaticFiles(directory=str(dist_dir / "assets")), name="static-assets")
 
         # Override the root "/" route to serve index.html instead of API JSON
-        # We need to remove the existing "/" route and replace it
         app.routes[:] = [r for r in app.routes if not (hasattr(r, 'path') and r.path == '/' and hasattr(r, 'endpoint') and r.endpoint.__name__ == 'read_root')]
 
         @app.get("/", include_in_schema=False)
         async def serve_index():
             return FileResponse(str(index_file))
 
-        # Catch-all: serve index.html for client-side routes (React Router)
-        @app.api_route("/{full_path:path}", methods=["GET"], include_in_schema=False)
-        async def serve_spa(full_path: str):
-            # Don't intercept API, stats, or config routes
-            if full_path.startswith("api/") or full_path in ("stats", "config"):
-                return None
+        # Use 404 exception handler for SPA fallback instead of a catch-all route.
+        # A catch-all /{path:path} would intercept API calls (e.g. /api/leads
+        # without trailing slash) before they reach the router, returning null.
+        @app.exception_handler(404)
+        async def spa_fallback(request, exc):
+            path = request.url.path
+            if path.startswith("/api") or path in ("/stats", "/config"):
+                from fastapi.responses import JSONResponse
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
             return FileResponse(str(index_file))
 
         print(f"[BruceLeads] Serving frontend from {dist_dir}")
@@ -117,7 +120,6 @@ def main():
 
     if is_frozen:
         # Production / EXE mode
-        # Import and mount the frontend
         from backend.main import app
         mount_static_frontend(app)
 
@@ -131,15 +133,19 @@ def main():
             log_level="warning"
         )
     else:
-        # Development mode — use reload for hot reloading
+        # Development mode
+        from backend.main import app
+
+        # Mount the built frontend if available (enables localhost:8000 for full-stack dev)
+        mount_static_frontend(app)
+
         print(f"[BruceLeads] Dev server starting on http://localhost:{port}")
-        print("[BruceLeads] Frontend dev server: cd frontend && npm run dev")
 
         uvicorn.run(
-            "backend.main:app",
+            app,
             host=host,
             port=port,
-            reload=True
+            reload=False
         )
 
 

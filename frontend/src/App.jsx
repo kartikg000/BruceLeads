@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import SetupWizard from './components/SetupWizard'
 import LoginScreen from './components/LoginScreen'
+import ErrorBoundary from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
 import FindLeads from './pages/FindLeads'
 import ManageLeads from './pages/ManageLeads'
@@ -93,19 +94,21 @@ export default function App() {
     }
 
     return (
-        <QueryClientProvider client={queryClient}>
-            <Router>
-                <Layout user={user} onLogout={handleLogout}>
-                    <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/find" element={<FindLeads />} />
-                        <Route path="/manage" element={<ManageLeads />} />
-                        <Route path="/email" element={<EmailStudio />} />
-                        <Route path="/outbox" element={<Outbox />} />
-                        <Route path="/settings" element={<Settings />} />
-                    </Routes>
-                </Layout>
-            </Router>
-        </QueryClientProvider>
+        <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+                <Router>
+                    <Layout user={user} onLogout={handleLogout}>
+                        <Routes>
+                            <Route path="/" element={<Dashboard />} />
+                            <Route path="/find" element={<FindLeads />} />
+                            <Route path="/manage" element={<ManageLeads />} />
+                            <Route path="/email" element={<EmailStudio />} />
+                            <Route path="/outbox" element={<Outbox />} />
+                            <Route path="/settings" element={<Settings />} />
+                        </Routes>
+                    </Layout>
+                </Router>
+            </QueryClientProvider>
+        </ErrorBoundary>
     )
 }
