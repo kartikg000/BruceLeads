@@ -38,6 +38,16 @@ pyinstaller --noconfirm --onedir --console --clean ^
     --add-data "utils;utils" ^
     --add-data "config.py;." ^
     --add-data "frontend/dist;frontend/dist" ^
+    --hidden-import "playwright" ^
+    --hidden-import "playwright.async_api" ^
+    --hidden-import "playwright.sync_api" ^
+    --hidden-import "playwright._impl" ^
+    --hidden-import "playwright._impl._connection" ^
+    --hidden-import "playwright._impl._driver" ^
+    --hidden-import "playwright._impl._transport" ^
+    --hidden-import "playwright_stealth" ^
+    --hidden-import "greenlet" ^
+    --hidden-import "pyee" ^
     --hidden-import "uvicorn" ^
     --hidden-import "uvicorn.logging" ^
     --hidden-import "uvicorn.loops" ^

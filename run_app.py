@@ -11,6 +11,24 @@ import threading
 import webbrowser
 from pathlib import Path
 
+# ── PyInstaller hidden-import hints ──
+# Worker scripts (worker.py, social_worker.py, enrich_worker.py, login_worker.py)
+# are executed via runpy.run_path() in --worker mode. PyInstaller cannot trace
+# their imports because they are added as data files. This block ensures all
+# worker dependencies are bundled in the frozen EXE.
+if False:  # never executed — only read by PyInstaller's analysis
+    import playwright.async_api          # worker.py, enrich_worker.py
+    import playwright.sync_api           # social_worker.py, login_worker.py
+    import playwright._impl              # internal playwright machinery
+    import playwright._impl._connection
+    import playwright._impl._driver
+    import playwright._impl._transport
+    import playwright_stealth             # stealth evasions in workers
+    import bs4                            # enrich_worker.py
+    import lxml                           # bs4 parser backend
+    import greenlet                       # playwright dependency
+    import pyee                           # playwright dependency
+
 
 def get_base_dir():
     """Get the base directory (works for both dev and frozen EXE)."""
