@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models import LeadsDatabase, Lead
-from backend.api import leads, scraper, email, gmail, sessions, setup, auth
+from backend.api import leads, scraper, email, gmail, sessions, setup, auth, updater
 from backend.dependencies import get_db
 
 app = FastAPI(title="BruceLeads API")
@@ -33,6 +33,7 @@ app.include_router(gmail.router, prefix="/api/gmail", tags=["gmail"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(setup.router, prefix="/api/setup", tags=["setup"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(updater.router, prefix="/api/update", tags=["update"])
 
 # --- Endpoints ---
 

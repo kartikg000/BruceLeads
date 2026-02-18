@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import SetupWizard from './components/SetupWizard'
 import ErrorBoundary from './components/ErrorBoundary'
+import UpdateBanner from './components/UpdateBanner'
 import Dashboard from './pages/Dashboard'
 import FindLeads from './pages/FindLeads'
 import ManageLeads from './pages/ManageLeads'
@@ -52,6 +53,7 @@ export default function App() {
     return (
         <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
+                <UpdateBanner />
                 <Router>
                     <Layout>
                         <Routes>

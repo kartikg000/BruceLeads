@@ -17,6 +17,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # =============================================================================
+# App Version  (bump this on each release)
+# =============================================================================
+APP_VERSION = "2.0.0"
+GITHUB_REPO = "kartikg000/BruceLeads"
+
+# =============================================================================
 # Paths  (never change at runtime)
 # =============================================================================
 if getattr(sys, 'frozen', False):

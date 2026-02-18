@@ -20,6 +20,36 @@ from utils import clean_business_name, normalize_url
 # Max concurrent tabs for visiting place pages (overridden via CLI)
 CONCURRENCY = 10
 
+# Stealth JS — masks navigator.webdriver and other automation signals
+STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+if (!window.chrome) window.chrome = {};
+if (!window.chrome.runtime) window.chrome.runtime = { connect: () => {}, sendMessage: () => {} };
+const origQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
+window.navigator.permissions.query = (params) =>
+    params.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : origQuery(params);
+Object.defineProperty(navigator, 'plugins', {
+    get: () => {
+        const a = [
+            { name: 'Chrome PDF Plugin',  filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+            { name: 'Chrome PDF Viewer',   filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+            { name: 'Native Client',       filename: 'internal-nacl-plugin', description: '' },
+        ];
+        a.refresh = () => {};
+        return a;
+    }
+});
+Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+"""
+
+MODERN_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
+
 
 # ── helpers ────────────────────────────────────────────────────
 
@@ -106,17 +136,22 @@ async def scrape_google_maps(
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             headless=headless,
-            args=['--disable-blink-features=AutomationControlled', '--no-sandbox'],
+            args=['--disable-blink-features=AutomationControlled', '--no-sandbox',
+                  '--disable-infobars', '--disable-dev-shm-usage'],
         )
         context = await browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
+            user_agent=MODERN_UA,
             viewport={'width': 1920, 'height': 1080},
             locale='en-US',
         )
+
+        # Apply stealth evasions
+        await context.add_init_script(STEALTH_JS)
+        try:
+            from playwright_stealth import Stealth
+            await Stealth().apply_stealth_async(context)
+        except Exception:
+            pass  # init-script fallback is already active
 
         # ── Phase 1: search + scroll (sequential, one page) ──────
         page = await context.new_page()

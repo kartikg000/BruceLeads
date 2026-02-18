@@ -18,7 +18,7 @@ from utils import get_python_executable
 # Platform login URLs
 PLATFORM_LOGIN_URLS = {
     "linkedin": "https://www.linkedin.com/login",
-    "twitter": "https://twitter.com/i/flow/login",
+    "twitter": "https://x.com/i/flow/login",
     "reddit": "https://www.reddit.com/login/",
     "instagram": "https://www.instagram.com/accounts/login/",
     "facebook": "https://www.facebook.com/login/"
@@ -26,11 +26,11 @@ PLATFORM_LOGIN_URLS = {
 
 # URLs that indicate successful login (URL contains these after login)
 PLATFORM_LOGGED_IN_INDICATORS = {
-    "linkedin": ["linkedin.com/feed", "linkedin.com/mynetwork", "linkedin.com/in/"],
-    "twitter": ["x.com/home", "twitter.com/home"],
-    "reddit": ["reddit.com/", "reddit.com/r/"],
-    "instagram": ["instagram.com/"],
-    "facebook": ["facebook.com/"]
+    "linkedin": ["linkedin.com/feed", "linkedin.com/mynetwork", "linkedin.com/in/", "linkedin.com/jobs"],
+    "twitter": ["x.com/home", "x.com/notifications", "x.com/explore", "twitter.com/home"],
+    "reddit": ["reddit.com/?feed=", "reddit.com/r/", "reddit.com/best", "reddit.com/hot"],
+    "instagram": ["instagram.com/accounts/onetap", "instagram.com/explore", "instagram.com/direct"],
+    "facebook": ["facebook.com/home.php", "facebook.com/?sk=", "facebook.com/profile.php"]
 }
 
 
