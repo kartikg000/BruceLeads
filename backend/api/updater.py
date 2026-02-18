@@ -205,10 +205,32 @@ async def apply_update():
         updater_script.write_text(
             f"""@echo off
 echo [BruceLeads Updater] Waiting for app to exit...
-timeout /t 3 /nobreak >nul
 
+REM Force-kill the app and any lingering Playwright/Chromium processes
+taskkill /F /IM "{exe_name}" >nul 2>&1
+taskkill /F /IM "chromium.exe" >nul 2>&1
+taskkill /F /IM "chrome.exe" >nul 2>&1
+
+REM Wait until the EXE file is no longer locked (up to 30 seconds)
+set /a tries=0
+:waitloop
+set /a tries+=1
+if %tries% gtr 15 goto forcecopy
+copy /Y NUL "{app_dir / exe_name}" >nul 2>&1 && goto docopy
+echo [BruceLeads Updater] Waiting for files to unlock... (attempt %tries%)
+timeout /t 2 /nobreak >nul
+goto waitloop
+
+:forcecopy
+echo [BruceLeads Updater] Force-proceeding after timeout...
+
+:docopy
 echo [BruceLeads Updater] Copying new files...
-xcopy /E /Y /I /Q "{source_dir}\\*" "{app_dir}\\" >nul 2>&1
+robocopy "{source_dir}" "{app_dir}" /E /IS /IT /R:10 /W:2 /NFL /NDL /NJH /NJS /NC /NS >nul 2>&1
+if errorlevel 8 (
+    echo [BruceLeads Updater] robocopy failed, trying xcopy fallback...
+    xcopy /E /Y /I /Q "{source_dir}\\*" "{app_dir}\\"
+)
 
 echo [BruceLeads Updater] Cleaning up temp files...
 rmdir /S /Q "{tmp_dir}" >nul 2>&1
