@@ -173,7 +173,7 @@ def _max_leads():
     return int(_resolve("max_leads_per_session", "MAX_LEADS_PER_SESSION", "50"))
 
 def _max_concurrent_browsers():
-    return int(_resolve("max_concurrent_browsers", "MAX_CONCURRENT_BROWSERS", "3"))
+    return int(_resolve("max_concurrent_browsers", "MAX_CONCURRENT_BROWSERS", "10"))
 
 # Register dynamic scraping keys
 _DYNAMIC_KEYS.update({

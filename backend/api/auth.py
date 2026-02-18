@@ -1,6 +1,7 @@
 """
 Google OAuth Authentication
 Login with Google, session management, logout.
+Also provisions the Gmail API token so the emailer can send via OAuth.
 """
 
 import json
@@ -16,10 +17,14 @@ router = APIRouter()
 _SESSION_FILE = config.DATA_DIR / "auth_session.json"
 _oauth_state = {}
 
+# Combined scopes: login + Gmail send
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly",
 ]
 
 
@@ -34,6 +39,16 @@ def _load_session() -> dict:
 
 def _save_session(data: dict):
     _SESSION_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _save_gmail_token(credentials):
+    """Persist the OAuth token so GmailClient can send via Gmail API."""
+    try:
+        token_path = config.GMAIL_TOKEN_FILE
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(credentials.to_json(), encoding="utf-8")
+    except Exception as exc:
+        print(f"[auth] Warning: could not save gmail token: {exc}")
 
 
 # ─── Endpoints ────────────────────────────────────────────────
@@ -87,6 +102,9 @@ def auth_callback(code: str = None, error: str = None):
         redirect_uri="http://localhost:8000/api/auth/callback",
     )
     flow.fetch_token(code=code)
+
+    # Save the token for GmailClient (email sending via Gmail API)
+    _save_gmail_token(flow.credentials)
 
     # Fetch user profile from Google
     import requests as req

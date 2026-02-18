@@ -64,7 +64,8 @@ class GoogleMapsScraper:
             query,
             location,
             str(self.max_results),
-            str(self.headless).lower()
+            str(self.headless).lower(),
+            str(getattr(config, 'MAX_CONCURRENT_BROWSERS', 10)),
         ]
         
         try:
