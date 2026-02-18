@@ -68,9 +68,34 @@ def scrape_social_search(
 ) -> dict:
     """
     Search for leads on social media via Google X-Ray search.
+    If headless mode hits a CAPTCHA, automatically retries with a visible browser.
 
     Platforms: linkedin, twitter, reddit, instagram, facebook
     """
+    result = _do_google_search(query, platform, max_results, headless, profile_dir, browser_type)
+
+    # If headless CAPTCHA, retry with visible browser
+    if not result.get("success") and headless:
+        has_captcha = any("captcha" in e.lower() for e in result.get("errors", []))
+        if has_captcha:
+            print(f"Headless CAPTCHA detected for {platform} — retrying with visible browser...", file=sys.stderr)
+            result = _do_google_search(query, platform, max_results, False, profile_dir, browser_type)
+            if result.get("success"):
+                # Clear the original captcha error since retry worked
+                result["errors"] = [e for e in result.get("errors", []) if "captcha" not in e.lower()]
+
+    return result
+
+
+def _do_google_search(
+    query: str,
+    platform: str,
+    max_results: int,
+    headless: bool,
+    profile_dir: str = None,
+    browser_type: str = None,
+) -> dict:
+    """Internal: perform a single Google X-Ray search attempt."""
     leads = []
     errors = []
 
@@ -139,44 +164,98 @@ def scrape_social_search(
             _apply_stealth(context)
             page = context.new_page()
 
-        print(f"Navigating to: {search_url}", file=sys.stderr)
-        page.goto(search_url, wait_until='load', timeout=45000)
-        time.sleep(random.uniform(2, 4))
-
-        # Accept Google cookies banner
+        # ── Human-like Google search flow ──
+        # Step 1: Navigate to Google homepage first (not directly to search URL)
+        print(f"Opening Google homepage...", file=sys.stderr)
         try:
-            for selector in ['button:has-text("Accept all")', 'button:has-text("I agree")', 'button:has-text("Accept")']:
+            # Set consent cookie to skip cookie consent banner
+            context.add_cookies([{
+                'name': 'SOCS',
+                'value': 'CAISHAgBEhJnd3NfMjAyNDA4MTUtMF9SQzIaAmVuIAEaBgiAo_C3Bg',
+                'domain': '.google.com',
+                'path': '/',
+            }])
+        except Exception:
+            pass
+
+        page.goto('https://www.google.com', wait_until='load', timeout=30000)
+        time.sleep(random.uniform(1.5, 3.0))
+
+        # Accept Google cookies banner if it appears
+        try:
+            for selector in ['button:has-text("Accept all")', 'button:has-text("I agree")', 'button:has-text("Accept")', '#L2AGLb']:
                 btn = page.locator(selector)
                 if btn.count() > 0:
                     btn.first.click()
-                    time.sleep(1)
+                    time.sleep(random.uniform(0.5, 1.5))
                     break
         except Exception:
             pass
 
-        # Wait for search results
-        try:
-            page.wait_for_selector('#search, #rso, .g', timeout=15000)
-        except PlaywrightTimeout:
+        # Step 2: Type the query into the search box like a human
+        search_box = page.locator('textarea[name="q"], input[name="q"]').first
+        if search_box.count() == 0:
+            # Fallback: navigate directly if search box not found
+            print(f"Search box not found, falling back to direct URL", file=sys.stderr)
+            page.goto(search_url, wait_until='load', timeout=45000)
+            time.sleep(random.uniform(2, 4))
+        else:
+            search_box.click()
+            time.sleep(random.uniform(0.3, 0.8))
+            # Type slowly like a human
+            search_box.press_sequentially(full_query, delay=random.uniform(40, 90))
+            time.sleep(random.uniform(0.5, 1.0))
+            page.keyboard.press('Enter')
+            print(f"Typed query: {full_query}", file=sys.stderr)
+
+        time.sleep(random.uniform(2.0, 4.0))
+
+        # Step 3: Check for CAPTCHA
+        def _check_captcha():
             content = page.content().lower()
             captcha_keywords = [
                 "verify it's you", "captcha", "unusual traffic",
                 "not a robot", "recaptcha", "challenge-form",
-                "verify you are a human",
+                "verify you are a human", "before you continue",
+                "detected unusual traffic",
             ]
-            if any(kw in content for kw in captcha_keywords):
+            return any(kw in content for kw in captcha_keywords)
+
+        if _check_captcha():
+            if headless:
                 errors.append(
-                    "Google CAPTCHA detected. Try: 1) Uncheck 'Headless Mode', "
-                    "2) Log into your Google account in the platform login browser"
+                    "Google CAPTCHA blocked the search. "
+                    "Uncheck 'Headless Mode' and try again."
                 )
                 return {"success": False, "leads": [], "errors": errors, "total_found": 0}
-            errors.append("Could not find results (selector timeout)")
+            else:
+                # In visible mode, give user time to solve CAPTCHA
+                print("CAPTCHA detected — waiting for user to solve it...", file=sys.stderr)
+                for _ in range(60):  # wait up to 2 min
+                    time.sleep(2)
+                    if not _check_captcha():
+                        break
+                else:
+                    errors.append("CAPTCHA was not solved in time.")
+                    return {"success": False, "leads": [], "errors": errors, "total_found": 0}
+
+        # Step 4: Wait for search results
+        try:
+            page.wait_for_selector('#search, #rso, .g', timeout=15000)
+        except PlaywrightTimeout:
+            if _check_captcha():
+                errors.append(
+                    "Google CAPTCHA blocked the search. "
+                    "Uncheck 'Headless Mode' and try again."
+                )
+            else:
+                errors.append("No results found (Google may be blocking automated searches)")
             return {"success": False, "leads": [], "errors": errors, "total_found": 0}
 
-        # Scroll to load more results
-        for _ in range(3):
+        # Step 5: Scroll to load more results (human-like)
+        for i in range(3):
             page.keyboard.press('End')
-            time.sleep(1.0)
+            time.sleep(random.uniform(0.8, 1.5))
 
         # Parse results
         result_elements = page.locator('.g').all()

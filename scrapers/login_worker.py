@@ -83,7 +83,7 @@ LOGIN_PAGE_PATTERNS = [
 
 # Platform-specific URLs that *prove* login succeeded
 SUCCESS_PATTERNS = {
-    'linkedin': ['/feed', '/mynetwork', '/messaging', '/in/', '/notifications', '/jobs', '/search/results'],
+    'linkedin': ['/feed', '/mynetwork', '/messaging', '/in/', '/notifications', '/jobs', '/search/results', '/check/manage-account'],
     'twitter':  ['/home', '/compose', '/notifications', '/explore', '/messages', '/i/bookmarks'],
     'reddit':   ['reddit.com/?feed=', '/r/', '/user/', 'reddit.com/best', 'reddit.com/hot', 'reddit.com/new'],
     'instagram':['/accounts/onetap', '/explore', '/direct', '/reels', '/?variant='],
@@ -161,32 +161,51 @@ def run_login(platform: str, login_url: str, profile_dir: str, browser_type: str
         platform_success = SUCCESS_PATTERNS.get(platform.lower(), [])
         platform_domains = PLATFORM_DOMAINS.get(platform.lower(), [])
 
+        def _check_url(url: str) -> bool:
+            """Return True if this URL indicates successful login."""
+            url = url.lower()
+            # A) Explicit success URL patterns
+            if any(pat in url for pat in platform_success):
+                return True
+            # B) On platform domain but no longer on a login/challenge page
+            on_platform = any(d in url for d in platform_domains)
+            on_login_page = any(pat in url for pat in LOGIN_PAGE_PATTERNS)
+            if on_platform and not on_login_page and time.time() - start_time > 12:
+                return True
+            return False
+
         while time.time() - start_time < max_wait:
             try:
-                if page.is_closed():
+                # Check ALL open pages/tabs — not just the first one.
+                # LinkedIn (and others) may open the feed in a new tab.
+                all_pages = context.pages
+                if not all_pages:
                     browser_closed = True
                     break
 
-                current_url = page.url.lower()
+                for p in all_pages:
+                    try:
+                        if p.is_closed():
+                            continue
+                        current_url = p.url
+                        if _check_url(current_url):
+                            print(f"Login detected: {current_url}", file=sys.stderr)
+                            login_confirmed = True
+                            break
+                    except Exception:
+                        continue
 
-                # A) Check for explicit success URLs
-                if any(pat in current_url for pat in platform_success):
-                    print(f"Login detected (success URL): {current_url}", file=sys.stderr)
-                    login_confirmed = True
-                    time.sleep(4)
+                if login_confirmed:
+                    time.sleep(3)
                     break
 
-                # B) If we are on the platform domain AND no longer on a login/challenge page
-                on_platform = any(d in current_url for d in platform_domains)
-                on_login_page = any(pat in current_url for pat in LOGIN_PAGE_PATTERNS)
-
-                if on_platform and not on_login_page:
-                    # Wait at least 12 s to avoid false positives (page redirects)
-                    if time.time() - start_time > 12:
-                        print(f"Login detected (left login page): {current_url}", file=sys.stderr)
-                        login_confirmed = True
-                        time.sleep(4)
+                # Also check if the original page was closed by the user
+                try:
+                    if page.is_closed() and len(all_pages) <= 1:
+                        browser_closed = True
                         break
+                except Exception:
+                    pass
 
             except Exception:
                 browser_closed = True

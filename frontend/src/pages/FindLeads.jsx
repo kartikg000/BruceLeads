@@ -77,11 +77,14 @@ function GoogleMapsTab({ queryClient }) {
             setScrapeProgress({ current: 0, total: maxLeads, status: 'scraping', message: 'Starting scraper...' })
         },
         onSuccess: (response) => {
+            const found = response.leads_found || 0
             setScrapeProgress({
-                current: response.leads_found || 0,
-                total: response.leads_found || 0,
-                status: 'complete',
-                message: `Found ${response.leads_found} leads!`
+                current: found,
+                total: found,
+                status: found > 0 ? 'complete' : 'error',
+                message: found > 0
+                    ? `Found ${found} leads!`
+                    : response.message || 'No leads found. Try unchecking "Run in background" or changing your search.'
             })
             setIsScrapingActive(false)
             queryClient.invalidateQueries(['leads'])
@@ -501,16 +504,31 @@ function SocialMediaTab({ queryClient }) {
             </form>
 
             {/* Search Result */}
-            {searchMutation.isSuccess && (
+            {searchMutation.isSuccess && searchMutation.data?.leads_found > 0 && (
                 <div className="flex items-center gap-3 text-green-400 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <CheckCircle size={20} />
                     <div>
-                        <p className="font-medium">Found {searchMutation.data?.leads_found || 0} leads!</p>
+                        <p className="font-medium">Found {searchMutation.data.leads_found} leads!</p>
                         <p className="text-sm text-zinc-500">Check Manage Data to view your leads.</p>
                     </div>
                 </div>
             )}
-            {searchMutation.isError && (
+            {searchMutation.isSuccess && searchMutation.data?.leads_found === 0 && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-2">
+                    <p className="font-medium text-amber-400">No leads found</p>
+                    {searchMutation.data?.errors?.length > 0 && (
+                        <ul className="text-sm text-amber-300/80 space-y-1">
+                            {searchMutation.data.errors.map((err, i) => (
+                                <li key={i}>⚠ {err}</li>
+                            ))}
+                        </ul>
+                    )}
+                    {(!searchMutation.data?.errors || searchMutation.data.errors.length === 0) && (
+                        <p className="text-sm text-zinc-500">Try a different query or uncheck Headless Mode.</p>
+                    )}
+                </div>
+            )}
+            {(searchMutation.isError) && (
                 <div className="text-red-400 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
                     <p className="font-medium">Search failed: {searchMutation.error?.message || 'Unknown error'}</p>
                 </div>

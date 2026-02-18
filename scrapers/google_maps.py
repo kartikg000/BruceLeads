@@ -12,6 +12,7 @@ from pathlib import Path
 
 from models import Lead, LeadSource
 from utils import get_python_executable
+import config
 
 
 @dataclass
