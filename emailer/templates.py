@@ -1,0 +1,186 @@
+"""
+Email Templates
+Prompt templates for AIDA and PAS copywriting frameworks.
+"""
+
+
+AIDA_TEMPLATE = """You are an expert cold email copywriter specializing in B2B outreach. 
+Write a brief, personalized cold email using the AIDA framework:
+
+- **Attention**: Open with a hook that grabs attention (personalized observation, compliment, or intriguing question)
+- **Interest**: Build interest by connecting to their specific situation
+- **Desire**: Create desire by hinting at benefits without being salesy  
+- **Action**: End with a soft, low-commitment call to action
+
+## Lead Information:
+- Business Name: {business_name}
+- Owner/Contact Name: {owner_name}
+- Website: {website}
+- Industry Context: {intent_signal}
+
+## Your Service/Offer:
+{service_description}
+
+## Requirements:
+- Tone: Professional yet conversational, with a touch of wit
+- Length: Under {max_words} words (this is critical - be concise!)
+- Avoid: Generic phrases like "I hope this finds you well", spam triggers, being pushy
+- CTA: Suggest a brief 15-minute call or simple reply
+- Personalization: Reference their specific business by name
+
+## Output Format:
+Return ONLY the email in this exact format:
+SUBJECT: [Your subject line here]
+---
+[Your email body here]
+
+[Signature with your name: {sender_name}]"""
+
+
+PAS_TEMPLATE = """You are an expert cold email copywriter specializing in B2B outreach.
+Write a brief, personalized cold email using the PAS framework:
+
+- **Problem**: Identify a specific pain point they likely face
+- **Agitate**: Briefly emphasize the impact of this problem  
+- **Solution**: Position your offer as the solution (without being salesy)
+
+## Lead Information:
+- Business Name: {business_name}
+- Owner/Contact Name: {owner_name}
+- Website: {website}
+- Industry Context: {intent_signal}
+
+## Your Service/Offer:
+{service_description}
+
+## Requirements:
+- Tone: Professional yet conversational, with a touch of wit
+- Length: Under {max_words} words (this is critical - be concise!)
+- Avoid: Generic phrases, fear-mongering, spam triggers
+- CTA: Suggest a brief 15-minute call or simple reply
+- Personalization: Reference their specific business by name
+
+## Output Format:
+Return ONLY the email in this exact format:
+SUBJECT: [Your subject line here]
+---
+[Your email body here]
+
+[Signature with your name: {sender_name}]"""
+
+
+FOLLOWUP_TEMPLATE = """You are an expert cold email copywriter.
+Write a brief follow-up email to someone who hasn't responded to your initial outreach.
+
+## Original Context:
+- Business Name: {business_name}
+- Owner/Contact Name: {owner_name}
+- Days Since Last Email: {days_since}
+
+## Your Service/Offer:
+{service_description}
+
+## Requirements:
+- Tone: Friendly, not pushy or guilt-tripping
+- Length: Under 60 words
+- Approach: Provide additional value or a fresh angle
+- Avoid: "Just following up", "Checking in", guilt language
+
+## Output Format:
+Return ONLY the email in this exact format:
+SUBJECT: Re: [Original subject theme]
+---
+[Your follow-up body here]
+
+[Signature with your name: {sender_name}]"""
+
+
+# Default service description if user doesn't provide one
+DEFAULT_SERVICE = """We help small businesses build professional websites that attract more 
+customers. Our approach focuses on clean design, fast loading, and high conversion rates."""
+
+
+def get_template(framework: str) -> str:
+    """
+    Get the prompt template for a given framework.
+    
+    Args:
+        framework: "AIDA", "PAS", or "FOLLOWUP"
+        
+    Returns:
+        Template string
+    """
+    templates = {
+        "AIDA": AIDA_TEMPLATE,
+        "PAS": PAS_TEMPLATE,
+        "FOLLOWUP": FOLLOWUP_TEMPLATE
+    }
+    return templates.get(framework.upper(), AIDA_TEMPLATE)
+
+
+def format_template(
+    framework: str,
+    business_name: str,
+    owner_name: str = "",
+    website: str = "",
+    intent_signal: str = "",
+    service_description: str = "",
+    sender_name: str = "Your Name",
+    max_words: int = 120,
+    **kwargs
+) -> str:
+    """
+    Format a template with lead data.
+    
+    Args:
+        framework: Template framework to use
+        business_name: Name of the business
+        owner_name: Contact person's name
+        website: Business website URL
+        intent_signal: Context about why they're a good lead
+        service_description: What you're offering
+        sender_name: Your name for the signature
+        max_words: Maximum word count
+        **kwargs: Additional template variables
+        
+    Returns:
+        Formatted prompt ready for LLM
+    """
+    template = get_template(framework)
+    
+    # Use defaults if not provided
+    if not owner_name:
+        owner_name = "there"  # Generic fallback
+    if not service_description:
+        service_description = DEFAULT_SERVICE
+    if not intent_signal:
+        intent_signal = "Local business looking to grow their online presence"
+    
+    # Inject custom instructions if provided
+    custom_instructions = kwargs.get('custom_instructions', '')
+    custom_section = ""
+    if custom_instructions:
+        custom_section = f"\n## CUSTOM INSTRUCTIONS (IMPORTANT):\n{custom_instructions}\n"
+    
+    # Pre-format the template if it doesn't have the custom_instructions placeholder
+    # We append it to the Services section implicitly or just prepend to Requirements
+    
+    formatted = template.format(
+        business_name=business_name,
+        owner_name=owner_name,
+        website=website or "Not available",
+        intent_signal=intent_signal,
+        service_description=service_description,
+        sender_name=sender_name,
+        max_words=max_words,
+        **kwargs
+    )
+    
+    # Insert custom instructions before Requirements
+    if custom_section:
+        if "## Requirements:" in formatted:
+            formatted = formatted.replace("## Requirements:", f"{custom_section}\n## Requirements:")
+        else:
+            formatted += f"\n{custom_section}"
+            
+    return formatted
