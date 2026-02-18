@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 # =============================================================================
 # App Version  (bump this on each release)
 # =============================================================================
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.2.0"
 GITHUB_REPO = "kartikg000/BruceLeads"
 
 # =============================================================================
@@ -70,8 +70,15 @@ def _save_settings(data: dict):
     """Persist settings to disk and refresh cache."""
     global _settings_cache
     _settings_cache = data
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+    # Restrict file permissions (owner-only on POSIX, no-op on Windows)
+    try:
+        import stat
+        SETTINGS_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except (OSError, AttributeError):
+        pass
 
 
 def get_setting(key: str, default=None):

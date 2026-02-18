@@ -115,6 +115,7 @@ async def save_draft(draft: EmailDraft, db: LeadsDatabase = Depends(get_db)):
 async def send_email(draft: EmailDraft, db: LeadsDatabase = Depends(get_db)):
     """Send an email via Gmail API."""
     from emailer import GmailClient
+    from utils import validate_email as _validate_email
     
     lead = db.get_lead(draft.lead_id)
     if not lead:
@@ -122,6 +123,16 @@ async def send_email(draft: EmailDraft, db: LeadsDatabase = Depends(get_db)):
     
     if not lead.email:
         raise HTTPException(status_code=400, detail="Lead has no email address")
+
+    # Validate email format before sending
+    if not _validate_email(lead.email):
+        raise HTTPException(status_code=400, detail="Invalid email address format")
+
+    # Validate subject/body length
+    if len(draft.subject) > 998:  # RFC 5322 max header line
+        raise HTTPException(status_code=400, detail="Subject line too long")
+    if len(draft.body) > 100_000:
+        raise HTTPException(status_code=400, detail="Email body too large")
     
     try:
         gmail = GmailClient()

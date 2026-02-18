@@ -2,6 +2,11 @@
 Auto-Update API Router
 Checks GitHub Releases for newer versions and applies updates in-place.
 
+Security:
+  - Download URL is validated against github.com / objects.githubusercontent.com
+  - ZIP extraction uses safe path validation to prevent zip-slip attacks
+  - Shell script paths are quoted and validated
+
 Endpoints:
   GET  /api/update/check  — Compare local version to latest GitHub release
   POST /api/update/apply  — Download latest release ZIP, extract, restart app
@@ -14,7 +19,9 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
+import hashlib
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -23,6 +30,13 @@ from fastapi.responses import JSONResponse
 import config
 
 router = APIRouter()
+
+# Trusted domains for update downloads
+_TRUSTED_DOWNLOAD_HOSTS = {
+    "github.com",
+    "objects.githubusercontent.com",
+    "github-releases.githubusercontent.com",
+}
 
 # ─── Helpers ───────────────────────────────────────────────────
 
@@ -45,6 +59,37 @@ def _get_app_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
     return Path(__file__).resolve().parent.parent.parent
+
+
+def _is_trusted_url(url: str) -> bool:
+    """Validate that a download URL points to a trusted GitHub domain."""
+    try:
+        parsed = urlparse(url)
+        return (
+            parsed.scheme == "https"
+            and any(parsed.hostname == h or (parsed.hostname and parsed.hostname.endswith("." + h))
+                    for h in _TRUSTED_DOWNLOAD_HOSTS)
+        )
+    except Exception:
+        return False
+
+
+def _safe_extract(zf: zipfile.ZipFile, dest: Path):
+    """Extract ZIP safely, preventing zip-slip (path traversal) attacks."""
+    dest = dest.resolve()
+    for member in zf.infolist():
+        member_path = (dest / member.filename).resolve()
+        if not str(member_path).startswith(str(dest)):
+            raise zipfile.BadZipFile(f"Zip-slip detected: {member.filename}")
+    zf.extractall(dest)
+
+
+def _sanitize_path_for_shell(path: str) -> str:
+    """Reject paths with shell-dangerous characters."""
+    dangerous = set(';&|`$(){}[]!<>\n\r')
+    if any(c in path for c in dangerous):
+        raise ValueError(f"Unsafe characters in path: {path}")
+    return path
 
 
 # ─── Endpoints ─────────────────────────────────────────────────
@@ -102,9 +147,21 @@ async def apply_update():
     if not download_url:
         raise HTTPException(status_code=404, detail="No ZIP asset found in the latest release")
 
+    # Security: verify the download URL is from a trusted GitHub domain
+    if not _is_trusted_url(download_url):
+        raise HTTPException(status_code=400, detail="Download URL is not from a trusted source")
+
     app_dir = _get_app_dir()
     tmp_dir = Path(tempfile.mkdtemp(prefix="bruceleads_update_"))
     zip_path = tmp_dir / "update.zip"
+
+    # Validate paths don't contain dangerous shell characters
+    try:
+        _sanitize_path_for_shell(str(app_dir))
+        _sanitize_path_for_shell(str(tmp_dir))
+    except ValueError as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(e))
 
     # 2. Download the ZIP
     try:
@@ -118,14 +175,14 @@ async def apply_update():
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise HTTPException(status_code=502, detail=f"Download failed: {exc}")
 
-    # 3. Extract
+    # 3. Extract safely (prevent zip-slip)
     extract_dir = tmp_dir / "extracted"
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
-            zf.extractall(extract_dir)
-    except zipfile.BadZipFile:
+            _safe_extract(zf, extract_dir)
+    except zipfile.BadZipFile as e:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(status_code=500, detail="Downloaded file is not a valid ZIP")
+        raise HTTPException(status_code=500, detail=f"Invalid or unsafe ZIP: {e}")
 
     # The ZIP likely contains a single top-level folder (e.g. BruceLeads/)
     children = list(extract_dir.iterdir())

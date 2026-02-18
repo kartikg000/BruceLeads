@@ -173,12 +173,23 @@ async def import_csv(file: UploadFile = File(...), db: LeadsDatabase = Depends(g
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="File must be a .csv")
 
+    # Security: limit file size to 10MB
     content = await file.read()
-    text = content.decode('utf-8')
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+
     reader = csv.DictReader(io.StringIO(text))
 
     imported = 0
+    max_import = 5000  # Prevent importing excessively large datasets
     for row in reader:
+        if imported >= max_import:
+            break
         lead = Lead(
             business_name=row.get('Business Name', row.get('business_name', '')),
             owner_name=row.get('Owner', row.get('owner_name', '')),

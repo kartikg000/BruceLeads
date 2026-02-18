@@ -158,6 +158,25 @@ if __name__ == "__main__":
         # Run a worker script: BruceLeads.exe --worker <script> [args...]
         worker_script = sys.argv[2]
         worker_args = sys.argv[3:]
+
+        # Security: validate the worker script is within the project directory
+        import os
+        base = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+        try:
+            worker_path = Path(worker_script).resolve()
+            base_resolved = base.resolve()
+            if not str(worker_path).startswith(str(base_resolved)):
+                print(f"[BruceLeads] Security: worker script '{worker_script}' is outside project directory", file=sys.stderr)
+                sys.exit(1)
+            if not worker_path.exists():
+                print(f"[BruceLeads] Worker script not found: {worker_script}", file=sys.stderr)
+                sys.exit(1)
+            if not worker_path.suffix == '.py':
+                print(f"[BruceLeads] Worker script must be a .py file: {worker_script}", file=sys.stderr)
+                sys.exit(1)
+        except Exception as e:
+            print(f"[BruceLeads] Invalid worker script path: {e}", file=sys.stderr)
+            sys.exit(1)
         
         # Replace sys.argv so the worker sees the right args
         sys.argv = [worker_script] + worker_args

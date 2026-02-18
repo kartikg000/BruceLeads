@@ -7,6 +7,7 @@ Also provisions the Gmail API token so the emailer can send via OAuth.
 import json
 import os
 import secrets
+from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
@@ -16,6 +17,9 @@ router = APIRouter()
 
 _SESSION_FILE = config.DATA_DIR / "auth_session.json"
 _oauth_state = {}
+
+# Allowed redirect hosts (prevent open-redirect attacks)
+_ALLOWED_REDIRECT_HOSTS = {"localhost", "127.0.0.1"}
 
 # Combined scopes: login + Gmail send
 SCOPES = [
@@ -63,6 +67,18 @@ def has_credentials():
 @router.get("/login-url")
 def get_login_url(redirect: str = "http://localhost:8000"):
     """Generate a Google OAuth consent URL."""
+    # Validate redirect URL to prevent open-redirect attacks
+    try:
+        parsed = urlparse(redirect)
+        if parsed.hostname not in _ALLOWED_REDIRECT_HOSTS:
+            raise HTTPException(400, "Invalid redirect URL")
+        if parsed.scheme not in ("http", "https"):
+            raise HTTPException(400, "Invalid redirect URL scheme")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "Invalid redirect URL")
+
     if not config.GMAIL_CREDENTIALS_FILE.exists():
         raise HTTPException(400, "Upload Google OAuth credentials.json first")
 
@@ -86,6 +102,14 @@ def get_login_url(redirect: str = "http://localhost:8000"):
 def auth_callback(code: str = None, error: str = None):
     """Handle the OAuth redirect from Google."""
     redirect_base = _oauth_state.get("redirect", "http://localhost:8000")
+
+    # Validate redirect_base before using it
+    try:
+        parsed = urlparse(redirect_base)
+        if parsed.hostname not in _ALLOWED_REDIRECT_HOSTS:
+            redirect_base = "http://localhost:8000"
+    except Exception:
+        redirect_base = "http://localhost:8000"
 
     if error:
         return RedirectResponse(f"{redirect_base}/?auth_error={error}")

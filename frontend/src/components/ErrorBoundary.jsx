@@ -26,7 +26,7 @@ export default class ErrorBoundary extends Component {
                         <div>
                             <h2 className="text-xl font-bold text-white">Something went wrong</h2>
                             <p className="text-zinc-400 mt-2 text-sm">
-                                {this.state.error?.message || 'An unexpected error occurred.'}
+                                An unexpected error occurred. Please reload the app.
                             </p>
                         </div>
                         <button

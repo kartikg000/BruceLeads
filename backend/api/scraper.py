@@ -17,15 +17,36 @@ class ScrapeRequest(BaseModel):
     auto_enrich: bool = True
     use_google_search: bool = True
 
+    # Input validation
+    @classmethod
+    def __init_subclass__(cls):
+        pass
+
 class SocialScrapeRequest(BaseModel):
     query: str
     platforms: List[str]
     max_results: int = 10
     headless: bool = True
 
+
+_MAX_QUERY_LEN = 500
+_MAX_LOCATION_LEN = 200
+_ALLOWED_PLATFORMS = {"linkedin", "twitter", "reddit", "instagram", "facebook"}
+
+
 @router.post("/start")
 async def start_scrape(request: ScrapeRequest, background_tasks: BackgroundTasks, db: LeadsDatabase = Depends(get_db)):
     """Start a Google Maps scraping job."""
+    # Input validation
+    if len(request.query) > _MAX_QUERY_LEN:
+        return {"status": "error", "leads_found": 0, "message": f"Query too long (max {_MAX_QUERY_LEN} chars)"}
+    if len(request.location) > _MAX_LOCATION_LEN:
+        return {"status": "error", "leads_found": 0, "message": f"Location too long (max {_MAX_LOCATION_LEN} chars)"}
+    if not request.query.strip() or not request.location.strip():
+        return {"status": "error", "leads_found": 0, "message": "Query and location are required"}
+    if not 1 <= request.max_results <= 100:
+        return {"status": "error", "leads_found": 0, "message": "max_results must be 1-100"}
+
     scraper = GoogleMapsScraper(
         headless=request.headless,
         max_results=request.max_results
@@ -73,6 +94,17 @@ async def start_scrape(request: ScrapeRequest, background_tasks: BackgroundTasks
 @router.post("/social")
 async def start_social_scrape(request: SocialScrapeRequest, background_tasks: BackgroundTasks, db: LeadsDatabase = Depends(get_db)):
     """Start a social media intent scraping job."""
+    # Input validation
+    if len(request.query) > _MAX_QUERY_LEN:
+        return {"status": "error", "leads_found": 0, "message": f"Query too long (max {_MAX_QUERY_LEN} chars)"}
+    if not request.query.strip():
+        return {"status": "error", "leads_found": 0, "message": "Query is required"}
+    invalid_platforms = [p for p in request.platforms if p.lower() not in _ALLOWED_PLATFORMS]
+    if invalid_platforms:
+        return {"status": "error", "leads_found": 0, "message": f"Invalid platforms: {invalid_platforms}"}
+    if not 1 <= request.max_results <= 100:
+        return {"status": "error", "leads_found": 0, "message": "max_results must be 1-100"}
+
     from scrapers import SocialMediaScraper
     
     try:

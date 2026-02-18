@@ -32,13 +32,26 @@ class LoginRequest(BaseModel):
     browser: str = "chrome"
 
 
+_VALID_PLATFORMS = {"linkedin", "twitter", "reddit", "instagram", "facebook"}
+_VALID_BROWSERS = {"chrome", "msedge", "chromium"}
+
+
 @router.post("/login")
 def platform_login(request: LoginRequest):
     """
     Launch a visible browser for manual login.
     Blocks until the user finishes (up to 5 min timeout).
     """
-    result = login_to_platform(request.platform.lower(), request.browser)
+    platform = request.platform.lower()
+    browser = request.browser.lower()
+    
+    # Validate inputs to prevent injection
+    if platform not in _VALID_PLATFORMS:
+        return {"success": False, "message": f"Invalid platform: {request.platform}"}
+    if browser not in _VALID_BROWSERS:
+        return {"success": False, "message": f"Invalid browser: {request.browser}"}
+    
+    result = login_to_platform(platform, browser)
     return result
 
 

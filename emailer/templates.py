@@ -148,18 +148,24 @@ def format_template(
     """
     template = get_template(framework)
     
-    # Use defaults if not provided
-    if not owner_name:
-        owner_name = "there"  # Generic fallback
-    if not service_description:
-        service_description = DEFAULT_SERVICE
-    if not intent_signal:
-        intent_signal = "Local business looking to grow their online presence"
+    # Sanitize user-supplied values to prevent prompt injection and limit length
+    def _sanitize(val: str, max_len: int = 500) -> str:
+        if not val:
+            return val
+        return val[:max_len]
+
+    business_name = _sanitize(business_name, 200)
+    owner_name = _sanitize(owner_name, 200) if owner_name else "there"
+    website = _sanitize(website, 500)
+    intent_signal = _sanitize(intent_signal, 500) if intent_signal else "Local business looking to grow their online presence"
+    service_description = _sanitize(service_description, 1000) if service_description else DEFAULT_SERVICE
+    sender_name = _sanitize(sender_name, 100)
     
     # Inject custom instructions if provided
     custom_instructions = kwargs.get('custom_instructions', '')
     custom_section = ""
     if custom_instructions:
+        custom_instructions = _sanitize(custom_instructions, 1000)
         custom_section = f"\n## CUSTOM INSTRUCTIONS (IMPORTANT):\n{custom_instructions}\n"
     
     # Pre-format the template if it doesn't have the custom_instructions placeholder

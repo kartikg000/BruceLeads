@@ -34,8 +34,17 @@ export default function UpdateBanner() {
                 return
             }
             setStatus('done')
-            // The server will shut down and restart. Poll until it's back.
+            // The server will shut down and restart. Poll until it's back (max 2 min).
+            let attempts = 0
+            const maxAttempts = 40  // 40 * 3s = 2 min
             const poll = setInterval(async () => {
+                attempts++
+                if (attempts > maxAttempts) {
+                    clearInterval(poll)
+                    setError('Server did not restart in time. Please restart the app manually.')
+                    setStatus('error')
+                    return
+                }
                 try {
                     await axios.get('/api/update/check')
                     clearInterval(poll)
@@ -43,7 +52,11 @@ export default function UpdateBanner() {
                 } catch { /* server still restarting */ }
             }, 3000)
         } catch (err) {
-            setError(err.response?.data?.detail || 'Update failed. Please try again or download manually.')
+            const detail = err.response?.data?.detail
+            // Don't expose raw server error details — show a generic message
+            setError(typeof detail === 'string' && detail.length < 200
+                ? detail
+                : 'Update failed. Please try again or download manually from GitHub.')
             setStatus('error')
         }
     }, [])

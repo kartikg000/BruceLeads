@@ -111,15 +111,22 @@ export default function ManageLeads() {
     }
 
     const handleExportCSV = () => {
+        // Sanitize cell value: escape double-quotes and prevent CSV formula injection
+        const sanitize = (val) => {
+            let s = String(val || '').replace(/"/g, '""')
+            // Prefix formula-trigger characters to prevent spreadsheet injection
+            if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
+            return `"${s}"`
+        }
         const csvContent = [
             ['Business Name', 'Owner', 'Email', 'Phone', 'Website', 'Status'].join(','),
             ...leads.map(l => [
-                `"${l.business_name || ''}"`,
-                `"${l.owner_name || ''}"`,
-                `"${l.email || ''}"`,
-                `"${l.phone || ''}"`,
-                `"${l.website || ''}"`,
-                `"${l.status || ''}"`
+                sanitize(l.business_name),
+                sanitize(l.owner_name),
+                sanitize(l.email),
+                sanitize(l.phone),
+                sanitize(l.website),
+                sanitize(l.status)
             ].join(','))
         ].join('\n')
 
@@ -129,6 +136,7 @@ export default function ManageLeads() {
         a.href = url
         a.download = `bruce_leads_${scope}_${new Date().toISOString().split('T')[0]}.csv`
         a.click()
+        URL.revokeObjectURL(url)
         showNotification('success', `Exported ${leads.length} leads to CSV!`)
     }
 

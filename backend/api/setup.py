@@ -116,6 +116,10 @@ async def upload_gmail_credentials(file: UploadFile = File(...)):
 
     content = await file.read()
 
+    # Security: limit file size to 100KB (credentials files are typically ~1KB)
+    if len(content) > 100 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 100KB)")
+
     # Validate it looks like a Google credentials file
     try:
         data = json.loads(content)
