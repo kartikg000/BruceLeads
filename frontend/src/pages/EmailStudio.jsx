@@ -41,9 +41,9 @@ export default function EmailStudio() {
         queryFn: async () => (await axios.get('/api/leads')).data
     })
 
-    // Filter for leads with email based on scope
+    // Filter for leads based on scope (email generation doesn't need recipient address)
     const emailableLeads = useMemo(() => {
-        let filtered = allLeads.filter(l => l.email && l.status !== 'sent')
+        let filtered = allLeads.filter(l => l.status !== 'sent')
         if (scope === 'current' && currentSearchIds.length > 0) {
             filtered = filtered.filter(l => currentSearchIds.includes(l.id))
         }
@@ -290,8 +290,8 @@ export default function EmailStudio() {
                         {emailableLeads.length === 0 ? (
                             <div className="text-center p-8 text-zinc-500">
                                 <Mail size={32} className="mx-auto mb-2 opacity-30" />
-                                <p className="text-sm">No leads ready for email.</p>
-                                <p className="text-xs text-zinc-600">Enrich leads first to find their email addresses.</p>
+                                <p className="text-sm">No leads found.</p>
+                                <p className="text-xs text-zinc-600">Scrape leads first, then generate emails here.</p>
                             </div>
                         ) : (
                             emailableLeads.map(lead => (
@@ -318,7 +318,9 @@ export default function EmailStudio() {
                                     <div className="flex-1 min-w-0">
                                         <div className="font-medium truncate">{lead.business_name}</div>
                                         <div className="flex items-center justify-between mt-1">
-                                            <span className="text-xs opacity-70 truncate">{lead.email}</span>
+                                            <span className={clsx("text-xs truncate", lead.email ? "opacity-70" : "text-amber-500/70")}>
+                                                {lead.email || 'No recipient email'}
+                                            </span>
                                             {lead.email_body && <Sparkles size={12} className="text-purple-400 flex-shrink-0" />}
                                         </div>
                                     </div>

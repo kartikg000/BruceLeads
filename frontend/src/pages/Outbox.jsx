@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Send, FileText, CheckCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Loader2, Shield, CheckSquare, Square } from 'lucide-react'
+import { Send, FileText, CheckCircle, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Loader2, Shield, CheckSquare, Square, AlertTriangle } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
@@ -22,8 +22,8 @@ export default function Outbox() {
         queryFn: async () => (await axios.get('/api/leads')).data
     })
 
-    // Filter to leads with email content ready
-    const readyLeads = leads.filter(l => l.email && l.email_body && l.status !== 'sent')
+    // Filter to leads with generated email content (recipient address not required to appear)
+    const readyLeads = leads.filter(l => l.email_body && l.status !== 'sent')
 
     // Auto-select current-session leads on first load, fall back to all
     if (!initialized && readyLeads.length > 0) {
@@ -47,6 +47,8 @@ export default function Outbox() {
     }
 
     const selectedLeads = readyLeads.filter(l => selectedIds.has(l.id))
+    const sendableLeads = selectedLeads.filter(l => l.email) // Only leads with recipient can be sent
+    const unsendableCount = selectedLeads.length - sendableLeads.length
 
     const toggleLead = (id) => {
         setSelectedIds(prev => {
@@ -106,7 +108,7 @@ export default function Outbox() {
     // Send/Draft mutation
     const sendMutation = useMutation({
         mutationFn: async () => {
-            const ids = selectedLeads.map(l => l.id)
+            const ids = sendableLeads.map(l => l.id) // Only send leads that have recipient email
             if (sendMode === 'drafts') {
                 return axios.post('/api/email/create-drafts', { lead_ids: ids })
             } else {
@@ -114,7 +116,7 @@ export default function Outbox() {
             }
         },
         onMutate: () => {
-            setProgress({ current: 0, total: selectedLeads.length, status: 'sending' })
+            setProgress({ current: 0, total: sendableLeads.length, status: 'sending' })
         },
         onSuccess: (response) => {
             const count = response.data?.sent || response.data?.created || 0
@@ -263,7 +265,13 @@ export default function Outbox() {
                                         >
                                             <div className="text-left">
                                                 <p className="font-medium text-white">{lead.business_name}</p>
-                                                <p className="text-sm text-zinc-500">→ {lead.email}</p>
+                                                {lead.email ? (
+                                                    <p className="text-sm text-zinc-500">→ {lead.email}</p>
+                                                ) : (
+                                                    <p className="text-sm text-amber-500 flex items-center gap-1">
+                                                        <AlertTriangle size={12} /> No recipient email — enrich to send
+                                                    </p>
+                                                )}
                                             </div>
                                             {expandedLeadId === lead.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                         </button>
@@ -355,9 +363,15 @@ export default function Outbox() {
                                 <div className="flex-1">
                                     <p className={sendMode === 'immediate' ? "text-orange-400" : "text-blue-400"}>
                                         {sendMode === 'drafts'
-                                            ? `You are about to create ${selectedLeads.length} draft${selectedLeads.length !== 1 ? 's' : ''} in your Gmail account.`
-                                            : `You are about to send ${selectedLeads.length} email${selectedLeads.length !== 1 ? 's' : ''} immediately!`}
+                                            ? `You are about to create ${sendableLeads.length} draft${sendableLeads.length !== 1 ? 's' : ''} in your Gmail account.`
+                                            : `You are about to send ${sendableLeads.length} email${sendableLeads.length !== 1 ? 's' : ''} immediately!`}
                                     </p>
+                                    {unsendableCount > 0 && (
+                                        <p className="text-amber-400 text-sm mt-1 flex items-center gap-1">
+                                            <AlertTriangle size={14} />
+                                            {unsendableCount} lead{unsendableCount !== 1 ? 's' : ''} missing recipient email — will be skipped
+                                        </p>
+                                    )}
                                     <label className="flex items-center gap-3 mt-3 cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -366,7 +380,7 @@ export default function Outbox() {
                                             className="rounded border-zinc-600 bg-zinc-700"
                                         />
                                         <span className="text-sm text-zinc-300">
-                                            I confirm I want to {sendMode === 'drafts' ? 'create drafts' : 'send emails'} for {selectedLeads.length} selected lead{selectedLeads.length !== 1 ? 's' : ''}
+                                            I confirm I want to {sendMode === 'drafts' ? 'create drafts' : 'send emails'} for {sendableLeads.length} lead{sendableLeads.length !== 1 ? 's' : ''}
                                         </span>
                                     </label>
                                 </div>
@@ -376,10 +390,10 @@ export default function Outbox() {
                         {/* Action Button */}
                         <button
                             onClick={() => sendMutation.mutate()}
-                            disabled={!confirmed || sendMutation.isPending || !gmailStatus?.connected || selectedLeads.length === 0}
+                            disabled={!confirmed || sendMutation.isPending || !gmailStatus?.connected || sendableLeads.length === 0}
                             className={clsx(
                                 "w-full h-14 rounded-xl font-semibold flex items-center justify-center gap-3 transition-all text-lg",
-                                !confirmed || !gmailStatus?.connected || selectedLeads.length === 0
+                                !confirmed || !gmailStatus?.connected || sendableLeads.length === 0
                                     ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
                                     : sendMode === 'drafts'
                                         ? "bg-blue-500 text-white hover:bg-blue-600"
@@ -389,9 +403,9 @@ export default function Outbox() {
                             {sendMutation.isPending ? (
                                 <><Loader2 className="animate-spin" size={20} /> Processing...</>
                             ) : sendMode === 'drafts' ? (
-                                <><FileText size={20} /> Create {selectedLeads.length} Draft{selectedLeads.length !== 1 ? 's' : ''}</>
+                                <><FileText size={20} /> Create {sendableLeads.length} Draft{sendableLeads.length !== 1 ? 's' : ''}</>
                             ) : (
-                                <><Send size={20} /> Send {selectedLeads.length} Email{selectedLeads.length !== 1 ? 's' : ''}</>
+                                <><Send size={20} /> Send {sendableLeads.length} Email{sendableLeads.length !== 1 ? 's' : ''}</>
                             )}
                         </button>
                     </div>
