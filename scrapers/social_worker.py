@@ -252,15 +252,36 @@ def _do_google_search(
                 errors.append("No results found (Google may be blocking automated searches)")
             return {"success": False, "leads": [], "errors": errors, "total_found": 0}
 
-        # Step 5: Scroll to load more results (human-like)
-        for i in range(3):
-            page.keyboard.press('End')
-            time.sleep(random.uniform(0.8, 1.5))
+        # Step 5: Scroll and paginate to collect enough results
+        def _collect_results():
+            """Scroll and collect all result elements on current page."""
+            for _ in range(3):
+                page.keyboard.press('End')
+                time.sleep(random.uniform(0.8, 1.5))
+            elements = page.locator('.g').all()
+            if not elements:
+                elements = page.locator('[data-header-feature]').all()
+            return elements
 
-        # Parse results
-        result_elements = page.locator('.g').all()
-        if not result_elements:
-            result_elements = page.locator('[data-header-feature]').all()
+        result_elements = _collect_results()
+        print(f"Found {len(result_elements)} raw results on page 1", file=sys.stderr)
+
+        # Click "Next" to get more results if we need them
+        page_num = 1
+        while len(result_elements) < max_results * 2 and page_num < 5:
+            try:
+                next_btn = page.locator('#pnnext, a[aria-label="Next page"], a:has-text("Next")').first
+                if next_btn.count() == 0:
+                    break
+                next_btn.click()
+                time.sleep(random.uniform(2.0, 3.5))
+                page.wait_for_selector('#search, #rso, .g', timeout=10000)
+                new_elements = _collect_results()
+                print(f"Found {len(new_elements)} raw results on page {page_num + 1}", file=sys.stderr)
+                result_elements.extend(new_elements)
+                page_num += 1
+            except Exception:
+                break
 
         print(f"Found {len(result_elements)} raw results", file=sys.stderr)
 

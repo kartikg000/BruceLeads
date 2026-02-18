@@ -179,13 +179,23 @@ async def scrape_google_maps(
 
         await asyncio.sleep(2)
 
-        # Scroll to load more results
+        # Scroll to load more results — scale scroll count with max_results
         try:
             container = page.locator('[role="feed"]').first
             if await container.count() > 0:
-                for _ in range(5):
+                scroll_count = max(5, (max_results // 3) + 3)
+                prev_count = 0
+                for i in range(scroll_count):
                     await container.evaluate('node => node.scrollTop = node.scrollHeight')
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1.2)
+                    # Check if we already have enough links
+                    cur_links = await page.locator('a[href*="/maps/place/"]').count()
+                    if cur_links >= max_results:
+                        break
+                    # Stop early if no new results loaded after 3 consecutive scrolls
+                    if cur_links == prev_count and i >= 4:
+                        break
+                    prev_count = cur_links
         except Exception:
             pass
 

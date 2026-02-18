@@ -31,6 +31,14 @@ async def generate_emails(request: GenerateRequest, db: LeadsDatabase = Depends(
     Note: For a real production app, this should be a background task with SSE/WebSockets.
     For now, we'll do simpler synchronous generation or trivial background updates.
     """
+    # Check Gemini API key upfront
+    import config as _cfg
+    if not _cfg.GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="Gemini API key is not set. Please add your Gemini API key in Settings → API Keys to generate AI-powered emails."
+        )
+
     results = []
 
     # Build custom composer if user provided AI params
