@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Trash2, RefreshCw, CheckCircle, AlertCircle, Mail, Key, Database, Loader2, Unlink, Zap, Save, Eye, EyeOff, Cpu, Thermometer, FileText, Upload } from 'lucide-react'
+import { Trash2, RefreshCw, CheckCircle, AlertCircle, Mail, Key, Database, Loader2, Unlink, Zap, Save, Eye, EyeOff, Cpu, Thermometer, FileText, Upload, Info, Download } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
@@ -21,6 +21,9 @@ export default function Settings() {
     const [savingKeys, setSavingKeys] = useState(false)
     const [savingSettings, setSavingSettings] = useState(false)
     const [uploadingOAuth, setUploadingOAuth] = useState(false)
+    const [checkingUpdate, setCheckingUpdate] = useState(false)
+    const [applyingUpdate, setApplyingUpdate] = useState(false)
+    const [updateInfo, setUpdateInfo] = useState(null)
 
     // Fetch settings from setup API
     const { data: setupSettings, refetch: refetchSettings } = useQuery({
@@ -193,6 +196,43 @@ export default function Settings() {
     const isConnected = oauthStatus?.status === 'connected'
     const isDisconnected = oauthStatus?.status === 'disconnected'
     const needsSetup = oauthStatus?.status === 'needs_setup'
+
+    // Check for updates
+    const handleCheckUpdate = async () => {
+        setCheckingUpdate(true)
+        try {
+            const res = await axios.get('/api/update/check')
+            setUpdateInfo(res.data)
+            if (!res.data.update_available) {
+                showNotification('success', `You're on the latest version (v${res.data.current_version})`)
+            }
+        } catch (err) {
+            showNotification('error', 'Could not check for updates')
+        }
+        setCheckingUpdate(false)
+    }
+
+    // Apply update
+    const handleApplyUpdate = async () => {
+        if (!window.confirm('This will download and apply the update, then restart the app. Continue?')) return
+        setApplyingUpdate(true)
+        try {
+            const res = await axios.post('/api/update/apply')
+            if (res.data?.status === 'already_up_to_date') {
+                showNotification('success', 'Already up to date!')
+            } else {
+                showNotification('success', 'Update applied! The app will restart shortly.')
+            }
+        } catch (err) {
+            showNotification('error', err.response?.data?.detail || 'Failed to apply update')
+        }
+        setApplyingUpdate(false)
+    }
+
+    // Auto-check for updates on mount
+    useEffect(() => {
+        axios.get('/api/update/check').then(res => setUpdateInfo(res.data)).catch(() => { })
+    }, [])
 
     // Section card wrapper
     const Section = ({ icon: Icon, title, badge, children, variant }) => (
@@ -501,6 +541,58 @@ export default function Settings() {
                     </div>
                 </div>
                 <p className="text-sm text-zinc-500">Data stored in <code className="bg-zinc-800 px-1 rounded">data/leads.json</code></p>
+            </Section>
+
+            {/* ─── About & Updates ─── */}
+            <Section icon={Info} title="About & Updates">
+                <div className="space-y-5">
+                    {/* Version Info */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium text-white">BruceLeads</p>
+                            <p className="text-sm text-zinc-500">
+                                Version <span className="text-zinc-300 font-mono">{updateInfo?.current_version || '...'}</span>
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleCheckUpdate}
+                            disabled={checkingUpdate}
+                            className="px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-lg hover:bg-zinc-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+                        >
+                            {checkingUpdate ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                            Check for Updates
+                        </button>
+                    </div>
+
+                    {/* Update Available */}
+                    {updateInfo?.update_available && (
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center gap-2 text-blue-400">
+                                <Download size={18} />
+                                <span className="font-medium">Update Available: v{updateInfo.latest_version}</span>
+                            </div>
+                            {updateInfo.release_notes && (
+                                <p className="text-sm text-zinc-400 whitespace-pre-line">{updateInfo.release_notes}</p>
+                            )}
+                            <button
+                                onClick={handleApplyUpdate}
+                                disabled={applyingUpdate}
+                                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium text-sm transition-colors flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {applyingUpdate ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                {applyingUpdate ? 'Applying Update...' : 'Download & Apply Update'}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Up to date */}
+                    {updateInfo && !updateInfo.update_available && (
+                        <div className="flex items-center gap-2 text-green-400 text-sm">
+                            <CheckCircle size={16} />
+                            <span>You're on the latest version</span>
+                        </div>
+                    )}
+                </div>
             </Section>
 
             {/* ─── Danger Zone ─── */}

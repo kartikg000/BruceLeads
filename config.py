@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 # =============================================================================
 # App Version  (bump this on each release)
 # =============================================================================
-APP_VERSION = "2.5.1"
+APP_VERSION = "2.6.0"
 GITHUB_REPO = "kartikg000/BruceLeads"
 
 # =============================================================================
@@ -222,7 +222,7 @@ _DYNAMIC_KEYS.update({
     "GEMINI_TEMPERATURE":      _gemini_temperature,
 })
 
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash"
 
 # =============================================================================
 # Data Storage

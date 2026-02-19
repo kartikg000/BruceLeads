@@ -25,24 +25,28 @@ export default function Outbox() {
     // Filter to leads with generated email content (recipient address not required to appear)
     const readyLeads = leads.filter(l => l.email_body && l.status !== 'sent')
 
-    // Auto-select current-session leads on first load, fall back to all
+    // Auto-select: prefer generated email IDs, fall back to search IDs, then all
     if (!initialized && readyLeads.length > 0) {
-        const stored = sessionStorage.getItem('currentSearchIds')
-        if (stored) {
+        let matched = []
+        // First try generated email IDs (from EmailStudio)
+        const genStored = sessionStorage.getItem('generatedEmailIds')
+        if (genStored) {
             try {
-                const ids = JSON.parse(stored)
-                const currentReady = readyLeads.filter(l => ids.includes(l.id))
-                if (currentReady.length > 0) {
-                    setSelectedIds(new Set(currentReady.map(l => l.id)))
-                } else {
-                    setSelectedIds(new Set(readyLeads.map(l => l.id)))
-                }
-            } catch {
-                setSelectedIds(new Set(readyLeads.map(l => l.id)))
-            }
-        } else {
-            setSelectedIds(new Set(readyLeads.map(l => l.id)))
+                const genIds = JSON.parse(genStored)
+                matched = readyLeads.filter(l => genIds.includes(l.id))
+            } catch { /* ignore */ }
         }
+        // Fall back to search IDs
+        if (matched.length === 0) {
+            const stored = sessionStorage.getItem('currentSearchIds')
+            if (stored) {
+                try {
+                    const ids = JSON.parse(stored)
+                    matched = readyLeads.filter(l => ids.includes(l.id))
+                } catch { /* ignore */ }
+            }
+        }
+        setSelectedIds(new Set(matched.length > 0 ? matched.map(l => l.id) : readyLeads.map(l => l.id)))
         setInitialized(true)
     }
 

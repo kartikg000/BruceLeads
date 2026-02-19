@@ -113,6 +113,12 @@ export default function EmailStudio() {
             }
             setBatchProgress({ current: 0, total: 0, status: 'idle' })
 
+            // Store generated lead IDs in sessionStorage so Outbox auto-selects them
+            const generatedIds = (data.generated || []).filter(g => g.subject || g.body).map(g => g.lead_id)
+            if (generatedIds.length > 0) {
+                sessionStorage.setItem('generatedEmailIds', JSON.stringify(generatedIds))
+            }
+
             if (data.status === 'error' || (succeeded === 0 && failed > 0)) {
                 const errMsg = data.error || data.generated?.[0]?.error || 'Unknown error'
                 showNotification('error', `Generation failed: ${errMsg}`)
