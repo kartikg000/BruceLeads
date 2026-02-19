@@ -8,7 +8,14 @@ import clsx from 'clsx'
 export default function EmailStudio() {
     const [selectedLeadIds, setSelectedLeadIds] = useState([])
     const [mode, setMode] = useState('single') // 'single' or 'batch'
-    const [scope, setScope] = useState('current') // 'current' or 'all'
+    const [scope, setScope] = useState(() => {
+        try {
+            const ids = JSON.parse(sessionStorage.getItem('currentSearchIds') || '[]')
+            return ids.length > 0 ? 'current' : 'all'
+        } catch {
+            return 'all'
+        }
+    })
     const [framework, setFramework] = useState('AIDA')
     const [instructions, setInstructions] = useState('')
     const [editedSubject, setEditedSubject] = useState('')
@@ -44,8 +51,12 @@ export default function EmailStudio() {
     // Filter for leads based on scope (email generation doesn't need recipient address)
     const emailableLeads = useMemo(() => {
         let filtered = allLeads.filter(l => l.status !== 'sent')
+        // 'current' scope: only show leads from the most recent scrape batch
         if (scope === 'current' && currentSearchIds.length > 0) {
             filtered = filtered.filter(l => currentSearchIds.includes(l.id))
+        } else if (scope === 'current' && currentSearchIds.length === 0) {
+            // No recent batch — show nothing until user switches to 'all'
+            filtered = []
         }
         return filtered
     }, [allLeads, scope, currentSearchIds])
