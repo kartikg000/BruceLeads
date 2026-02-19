@@ -21,8 +21,10 @@ Write a brief, personalized cold email using the AIDA framework:
 ## Your Service/Offer:
 {service_description}
 
+## Tone & Style:
+{tone_instructions}
+
 ## Requirements:
-- Tone: Professional yet conversational, with a touch of wit
 - Length: Under {max_words} words (this is critical - be concise!)
 - Avoid: Generic phrases like "I hope this finds you well", spam triggers, being pushy
 - CTA: Suggest a brief 15-minute call or simple reply
@@ -53,8 +55,10 @@ Write a brief, personalized cold email using the PAS framework:
 ## Your Service/Offer:
 {service_description}
 
+## Tone & Style:
+{tone_instructions}
+
 ## Requirements:
-- Tone: Professional yet conversational, with a touch of wit
 - Length: Under {max_words} words (this is critical - be concise!)
 - Avoid: Generic phrases, fear-mongering, spam triggers
 - CTA: Suggest a brief 15-minute call or simple reply
@@ -80,8 +84,10 @@ Write a brief follow-up email to someone who hasn't responded to your initial ou
 ## Your Service/Offer:
 {service_description}
 
+## Tone & Style:
+{tone_instructions}
+
 ## Requirements:
-- Tone: Friendly, not pushy or guilt-tripping
 - Length: Under 60 words
 - Approach: Provide additional value or a fresh angle
 - Avoid: "Just following up", "Checking in", guilt language
@@ -127,6 +133,7 @@ def format_template(
     service_description: str = "",
     sender_name: str = "Your Name",
     max_words: int = 120,
+    tone: str = "",
     **kwargs
 ) -> str:
     """
@@ -141,6 +148,7 @@ def format_template(
         service_description: What you're offering
         sender_name: Your name for the signature
         max_words: Maximum word count
+        tone: Desired email tone
         **kwargs: Additional template variables
         
     Returns:
@@ -160,16 +168,23 @@ def format_template(
     intent_signal = _sanitize(intent_signal, 500) if intent_signal else "Local business looking to grow their online presence"
     service_description = _sanitize(service_description, 1000) if service_description else DEFAULT_SERVICE
     sender_name = _sanitize(sender_name, 100)
+    tone = _sanitize(tone, 200) if tone else ""
+    
+    # Build tone instructions
+    if tone:
+        tone_instructions = f"Write in a {tone} tone. Match this style throughout the entire email — subject line, opening, body, and sign-off."
+    else:
+        tone_instructions = "Write in a professional yet conversational tone, with a touch of wit."
     
     # Inject custom instructions if provided
     custom_instructions = kwargs.get('custom_instructions', '')
     custom_section = ""
     if custom_instructions:
         custom_instructions = _sanitize(custom_instructions, 1000)
-        custom_section = f"\n## CUSTOM INSTRUCTIONS (IMPORTANT):\n{custom_instructions}\n"
+        custom_section = f"\n## CUSTOM INSTRUCTIONS (IMPORTANT — follow these closely):\n{custom_instructions}\n"
     
-    # Pre-format the template if it doesn't have the custom_instructions placeholder
-    # We append it to the Services section implicitly or just prepend to Requirements
+    # Remove keys we already handle explicitly to avoid duplicate kwarg errors
+    extra_kwargs = {k: v for k, v in kwargs.items() if k not in ('custom_instructions', 'tone')}
     
     formatted = template.format(
         business_name=business_name,
@@ -179,7 +194,8 @@ def format_template(
         service_description=service_description,
         sender_name=sender_name,
         max_words=max_words,
-        **kwargs
+        tone_instructions=tone_instructions,
+        **extra_kwargs,
     )
     
     # Insert custom instructions before Requirements

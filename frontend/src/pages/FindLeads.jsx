@@ -338,7 +338,7 @@ function SocialMediaTab({ queryClient }) {
     const handleSearch = (e) => {
         e.preventDefault()
         if (!query || platforms.length === 0) return
-        searchMutation.mutate({ query, platforms, max_results: maxResults, headless })
+        searchMutation.mutate({ query, platforms, max_results: maxResults, headless, auto_enrich: true })
     }
 
     return (

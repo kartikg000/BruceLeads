@@ -100,17 +100,32 @@ export default function EmailStudio() {
         },
         onSuccess: (response) => {
             queryClient.invalidateQueries(['leads'])
-            if (mode === 'single' && response.data?.generated?.[0]) {
-                const generated = response.data.generated[0]
-                setEditedSubject(generated.subject || '')
-                setEditedBody(generated.body || '')
+            const data = response.data || {}
+            const succeeded = data.succeeded ?? data.generated?.filter(g => !g.error).length ?? 0
+            const failed = data.failed ?? data.generated?.filter(g => g.error).length ?? 0
+
+            if (mode === 'single' && data.generated?.[0]) {
+                const generated = data.generated[0]
+                if (generated.subject || generated.body) {
+                    setEditedSubject(generated.subject || '')
+                    setEditedBody(generated.body || '')
+                }
             }
             setBatchProgress({ current: 0, total: 0, status: 'idle' })
-            showNotification('success', `Generated ${response.data?.generated?.length || 0} email(s)!`)
+
+            if (data.status === 'error' || (succeeded === 0 && failed > 0)) {
+                const errMsg = data.error || data.generated?.[0]?.error || 'Unknown error'
+                showNotification('error', `Generation failed: ${errMsg}`)
+            } else if (failed > 0) {
+                showNotification('success', `Generated ${succeeded} email(s), ${failed} failed.`)
+            } else {
+                showNotification('success', `Generated ${succeeded} email(s)!`)
+            }
         },
-        onError: () => {
+        onError: (error) => {
             setBatchProgress({ current: 0, total: 0, status: 'idle' })
-            showNotification('error', 'Failed to generate emails. Check your API key.')
+            const detail = error.response?.data?.detail || error.response?.data?.error || 'Check your Gemini API key in Settings.'
+            showNotification('error', `Failed to generate: ${detail}`)
         }
     })
 

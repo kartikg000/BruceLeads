@@ -40,26 +40,21 @@ async def generate_emails(request: GenerateRequest, db: LeadsDatabase = Depends(
         )
 
     results = []
+    succeeded = 0
+    failed = 0
+    last_error = ""
 
-    # Build custom composer if user provided AI params
-    gen_composer = composer
-    if any([
-        request.sender_name,
-        request.service_description,
-        request.temperature is not None,
-        request.max_words is not None,
-    ]):
-        gen_composer = EmailComposer(
-            sender_name=request.sender_name or composer.sender_name,
-            service_description=request.service_description or composer.service_description,
-            temperature=request.temperature,
-            max_words=request.max_words,
-        )
+    # Build custom composer — always use user-provided AI params
+    gen_composer = EmailComposer(
+        sender_name=request.sender_name or composer.sender_name,
+        service_description=request.service_description or composer.service_description,
+        temperature=request.temperature if request.temperature is not None else composer.temperature,
+        max_words=request.max_words if request.max_words is not None else composer.max_words,
+    )
 
-    # Build custom context including tone if provided
+    # Build custom context — tone is passed separately to the template
     custom_ctx = request.custom_instructions or ""
-    if request.tone:
-        custom_ctx = f"Tone: {request.tone}. " + custom_ctx
+    tone = request.tone or ""
     
     for lead_id in request.lead_ids:
         lead = db.get_lead(lead_id)
@@ -71,7 +66,8 @@ async def generate_emails(request: GenerateRequest, db: LeadsDatabase = Depends(
             result = gen_composer.compose(
                 lead, 
                 framework=request.framework,
-                custom_context=custom_ctx
+                custom_context=custom_ctx,
+                tone=tone
             )
             
             if result.success:
@@ -82,6 +78,7 @@ async def generate_emails(request: GenerateRequest, db: LeadsDatabase = Depends(
                     framework=request.framework
                 )
                 db.update_lead(lead)
+                succeeded += 1
                 
                 results.append({
                     "lead_id": lead.id,
@@ -89,6 +86,8 @@ async def generate_emails(request: GenerateRequest, db: LeadsDatabase = Depends(
                     "body": result.body
                 })
             else:
+                failed += 1
+                last_error = result.error or "Unknown generation error"
                 results.append({
                     "lead_id": lead.id,
                     "subject": "",
@@ -96,14 +95,31 @@ async def generate_emails(request: GenerateRequest, db: LeadsDatabase = Depends(
                     "error": result.error
                 })
         except Exception as e:
+            failed += 1
+            last_error = str(e)
             results.append({
                 "lead_id": lead.id,
                 "subject": "",
                 "body": "",
                 "error": str(e)
             })
-        
-    return {"status": "success", "generated": results}
+    
+    # If all failed, return error status with the reason
+    if succeeded == 0 and failed > 0:
+        return {
+            "status": "error",
+            "generated": results,
+            "succeeded": 0,
+            "failed": failed,
+            "error": last_error
+        }
+    
+    return {
+        "status": "success",
+        "generated": results,
+        "succeeded": succeeded,
+        "failed": failed
+    }
 
 @router.post("/save")
 async def save_draft(draft: EmailDraft, db: LeadsDatabase = Depends(get_db)):

@@ -27,6 +27,8 @@ class SocialScrapeRequest(BaseModel):
     platforms: List[str]
     max_results: int = 10
     headless: bool = True
+    auto_enrich: bool = True
+    use_google_search: bool = True
 
 
 _MAX_QUERY_LEN = 500
@@ -127,14 +129,30 @@ async def start_social_scrape(request: SocialScrapeRequest, background_tasks: Ba
                 all_errors.extend([f"{platform}: {e}" for e in result.get('errors')])
         
         # Save to database
-        leads_found = 0
+        lead_ids = []
         for lead in all_leads:
             db.add_lead(lead)
-            leads_found += 1
+            lead_ids.append(lead.id)
+        
+        leads_found = len(lead_ids)
+        
+        # Auto-enrich if requested (find emails/owner from websites)
+        if request.auto_enrich and all_leads:
+            try:
+                enricher = LeadEnricher(
+                    headless=request.headless,
+                    use_google_search=request.use_google_search
+                )
+                enriched = enricher.enrich_leads_sync(all_leads)
+                for lead in enriched:
+                    db.update_lead(lead)
+            except Exception as e:
+                all_errors.append(f"Enrichment error: {str(e)}")
         
         return {
             "status": "success" if leads_found > 0 else "error",
             "leads_found": leads_found,
+            "lead_ids": lead_ids,
             "errors": all_errors,
             "message": f"Found {leads_found} leads across {len(request.platforms)} platforms"
         }

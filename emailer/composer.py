@@ -133,7 +133,8 @@ class EmailComposer:
         self,
         lead: Lead,
         framework: str = None,
-        custom_context: str = ""
+        custom_context: str = "",
+        tone: str = ""
     ) -> EmailResult:
         """
         Generate a personalized email for a lead.
@@ -142,6 +143,7 @@ class EmailComposer:
             lead: Lead to generate email for
             framework: "AIDA" or "PAS" (uses config default if not provided)
             custom_context: Additional context to include
+            tone: Desired email tone (e.g. "casual and witty", "formal")
             
         Returns:
             EmailResult with subject and body
@@ -170,6 +172,7 @@ class EmailComposer:
             service_description=self.service_description,
             sender_name=self.sender_name,
             max_words=self.max_words,
+            tone=tone,
             custom_instructions=custom_context  # Pass explicit instructions
         )
         

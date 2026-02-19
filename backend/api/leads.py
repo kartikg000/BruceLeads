@@ -82,20 +82,27 @@ def batch_enrich(request: BatchRequest, db: LeadsDatabase = Depends(get_db)):
     """Enrich multiple leads by finding email/owner info."""
     from scrapers import LeadEnricher
     enricher = LeadEnricher()
-    enriched_count = 0
     
+    # Collect all leads to enrich in a single batch
+    leads_to_enrich = []
     for lead_id in request.lead_ids:
         lead = db.get_lead(lead_id)
         if lead:
-            try:
-                enriched_list = enricher.enrich_leads_sync([lead])
-                if enriched_list:
-                    enriched = enriched_list[0]
-                    enriched.update_status(LeadStatus.ENRICHED)
-                    db.update_lead(enriched)
-                    enriched_count += 1
-            except Exception as e:
-                print(f"Enrichment error for {lead_id}: {e}")
+            leads_to_enrich.append(lead)
+    
+    if not leads_to_enrich:
+        return {"status": "success", "enriched": 0}
+    
+    enriched_count = 0
+    try:
+        enriched_leads = enricher.enrich_leads_sync(leads_to_enrich)
+        for lead in enriched_leads:
+            if lead.email:
+                lead.update_status(LeadStatus.ENRICHED)
+                enriched_count += 1
+            db.update_lead(lead)
+    except Exception as e:
+        print(f"Batch enrichment error: {e}")
                 
     return {"status": "success", "enriched": enriched_count}
 
