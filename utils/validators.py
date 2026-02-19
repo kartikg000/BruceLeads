@@ -187,9 +187,20 @@ def extract_emails_from_text(text: str) -> list:
         'domain.com',
         'yoursite.com',
         'company.com',
+        'sentry.io',
+        'wixpress.com',
+        'cloudflare',
+        'webpack',
+        'babel',
+        'eslint',
         '.png',
         '.jpg',
-        '.gif'
+        '.gif',
+        '.svg',
+        '.webp',
+        '.css',
+        '.js',
+        '.woff',
     ]
     
     return [

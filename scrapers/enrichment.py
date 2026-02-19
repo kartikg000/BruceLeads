@@ -110,6 +110,8 @@ class LeadEnricher:
                     enriched = enriched_map[lead.id]
                     if enriched.get('email'):
                         lead.email = enriched['email']
+                    if enriched.get('phone'):
+                        lead.phone = enriched['phone']
                     if enriched.get('owner_name'):
                         lead.owner_name = enriched['owner_name']
                     if lead.email:
