@@ -1,0 +1,132 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Node.js for frontend build ──
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build React frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # ── Python for PyInstaller ──
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # ── Build EXE ──
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --noconfirm --onedir --console --clean ^
+            --name "BruceLeads" ^
+            --add-data "backend;backend" ^
+            --add-data "models;models" ^
+            --add-data "scrapers;scrapers" ^
+            --add-data "emailer;emailer" ^
+            --add-data "utils;utils" ^
+            --add-data "config.py;." ^
+            --add-data "frontend/dist;frontend/dist" ^
+            --hidden-import "playwright" ^
+            --hidden-import "playwright.async_api" ^
+            --hidden-import "playwright.sync_api" ^
+            --hidden-import "playwright._impl" ^
+            --hidden-import "playwright._impl._connection" ^
+            --hidden-import "playwright._impl._driver" ^
+            --hidden-import "playwright._impl._transport" ^
+            --hidden-import "playwright_stealth" ^
+            --hidden-import "greenlet" ^
+            --hidden-import "pyee" ^
+            --hidden-import "uvicorn" ^
+            --hidden-import "uvicorn.logging" ^
+            --hidden-import "uvicorn.loops" ^
+            --hidden-import "uvicorn.loops.auto" ^
+            --hidden-import "uvicorn.protocols" ^
+            --hidden-import "uvicorn.protocols.http" ^
+            --hidden-import "uvicorn.protocols.http.auto" ^
+            --hidden-import "uvicorn.protocols.websockets" ^
+            --hidden-import "uvicorn.protocols.websockets.auto" ^
+            --hidden-import "uvicorn.lifespan" ^
+            --hidden-import "uvicorn.lifespan.on" ^
+            --hidden-import "uvicorn.lifespan.off" ^
+            --hidden-import "fastapi" ^
+            --hidden-import "google.generativeai" ^
+            --hidden-import "google.auth" ^
+            --hidden-import "google.auth.transport.requests" ^
+            --hidden-import "google_auth_oauthlib" ^
+            --hidden-import "googleapiclient" ^
+            --hidden-import "bs4" ^
+            --hidden-import "dotenv" ^
+            --hidden-import "multipart" ^
+            --collect-submodules "uvicorn" ^
+            --collect-submodules "fastapi" ^
+            --collect-submodules "playwright" ^
+            --exclude-module "PyQt5" ^
+            --exclude-module "PyQt6" ^
+            --exclude-module "PySide2" ^
+            --exclude-module "PySide6" ^
+            --exclude-module "tkinter" ^
+            --exclude-module "panel" ^
+            --exclude-module "bokeh" ^
+            --exclude-module "matplotlib" ^
+            --exclude-module "scipy" ^
+            --exclude-module "sklearn" ^
+            --exclude-module "notebook" ^
+            --exclude-module "jupyterlab" ^
+            --exclude-module "jupyter" ^
+            --exclude-module "IPython" ^
+            --exclude-module "sphinx" ^
+            --exclude-module "tornado" ^
+            --exclude-module "zmq" ^
+            --exclude-module "cv2" ^
+            --exclude-module "PIL" ^
+            run_app.py
+        shell: cmd
+
+      - name: Create data directories
+        run: |
+          mkdir dist\BruceLeads\data 2>nul
+          mkdir dist\BruceLeads\credentials 2>nul
+        shell: cmd
+
+      # ── Verify EXE exists ──
+      - name: Verify build output
+        run: |
+          if (!(Test-Path "dist\BruceLeads\BruceLeads.exe")) {
+            Write-Error "BruceLeads.exe not found in dist\BruceLeads\"
+            exit 1
+          }
+          Write-Host "Build successful! EXE size: $((Get-Item 'dist\BruceLeads\BruceLeads.exe').Length / 1MB) MB"
+
+      # ── ZIP the dist folder ──
+      - name: Create release ZIP
+        run: |
+          cd dist
+          Compress-Archive -Path BruceLeads -DestinationPath BruceLeads-windows.zip -Force
+
+      # ── Upload to GitHub Release ──
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/BruceLeads-windows.zip
+          generate_release_notes: false

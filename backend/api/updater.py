@@ -222,9 +222,9 @@ async def apply_update():
 
         # Build the restart command
         if getattr(sys, "frozen", False):
-            restart_cmd = f'start "" "{app_dir / exe_name}"'
+            restart_cmd = f'start "BruceLeads" /D "{app_dir}" "{app_dir / exe_name}"'
         else:
-            restart_cmd = f'start "" python "{app_dir / "run_app.py"}"'
+            restart_cmd = f'start "BruceLeads" /D "{app_dir}" python "{app_dir / "run_app.py"}"'
 
         updater_script.write_text(
             f"""@echo off
@@ -235,22 +235,30 @@ taskkill /F /IM "{exe_name}" >nul 2>&1
 taskkill /F /IM "chromium.exe" >nul 2>&1
 taskkill /F /IM "chrome.exe" >nul 2>&1
 
-REM Wait until the EXE file is no longer locked (up to 30 seconds)
+REM Wait a few seconds for processes to fully release file locks
+timeout /t 5 /nobreak >nul
+
+REM Non-destructive file lock check: try to rename the EXE and back
+REM (unlike the old approach which corrupted the EXE by writing NUL to it)
 set /a tries=0
 :waitloop
 set /a tries+=1
 if %tries% gtr 15 goto forcecopy
-copy /Y NUL "{app_dir / exe_name}" >nul 2>&1 && goto docopy
-echo [BruceLeads Updater] Waiting for files to unlock... (attempt %tries%)
-timeout /t 2 /nobreak >nul
-goto waitloop
+ren "{app_dir / exe_name}" "{exe_name}.tmp" >nul 2>&1
+if errorlevel 1 (
+    echo [BruceLeads Updater] Waiting for files to unlock... (attempt %tries%)
+    timeout /t 2 /nobreak >nul
+    goto waitloop
+)
+ren "{app_dir / (exe_name + '.tmp')}" "{exe_name}" >nul 2>&1
+goto docopy
 
 :forcecopy
 echo [BruceLeads Updater] Force-proceeding after timeout...
 
 :docopy
 echo [BruceLeads Updater] Copying new files...
-robocopy "{source_dir}" "{app_dir}" /E /IS /IT /R:10 /W:2 /NFL /NDL /NJH /NJS /NC /NS >nul 2>&1
+robocopy "{source_dir}" "{app_dir}" /E /IS /IT /XD data credentials /R:10 /W:2 /NFL /NDL /NJH /NJS /NC /NS >nul 2>&1
 if errorlevel 8 (
     echo [BruceLeads Updater] robocopy failed, trying xcopy fallback...
     xcopy /E /Y /I /Q "{source_dir}\\*" "{app_dir}\\"
@@ -311,7 +319,9 @@ cd "{app_dir}"
 
     def _shutdown():
         import time
-        time.sleep(1)
+        # Give enough time for the HTTP response to be sent back to the client
+        # and for the updater script to start running
+        time.sleep(3)
         os._exit(0)
 
     threading.Thread(target=_shutdown, daemon=True).start()

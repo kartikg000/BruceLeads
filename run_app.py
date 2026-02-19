@@ -49,8 +49,74 @@ def setup_playwright_env():
         else:
             default_path = Path.home() / '.cache' / 'ms-playwright'
         
-        if default_path.exists():
-            os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(default_path)
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(default_path)
+
+
+def install_dependencies():
+    """Install required dependencies on first run.
+    Checks for Playwright browsers and installs them if missing.
+    Also installs pip requirements if running from source."""
+    import subprocess as _sp
+
+    is_frozen = getattr(sys, 'frozen', False)
+
+    # ── Playwright browsers ──
+    if sys.platform == 'win32':
+        browsers_dir = Path(os.environ.get('LOCALAPPDATA', '')) / 'ms-playwright'
+    else:
+        browsers_dir = Path.home() / '.cache' / 'ms-playwright'
+
+    # Check if chromium is installed (the main browser we need)
+    chromium_installed = False
+    if browsers_dir.exists():
+        for child in browsers_dir.iterdir():
+            if child.is_dir() and 'chromium' in child.name.lower():
+                chromium_installed = True
+                break
+
+    if not chromium_installed:
+        print("[BruceLeads] First run — installing Playwright Chromium browser...")
+        print("[BruceLeads] This may take a minute, please wait...")
+        try:
+            _sp.run(
+                [sys.executable, "-m", "playwright", "install", "chromium"],
+                check=True,
+                timeout=300,
+            )
+            print("[BruceLeads] Chromium browser installed successfully.")
+        except FileNotFoundError:
+            # In frozen mode, playwright might not be available as a module
+            # Try using the playwright CLI directly
+            try:
+                _sp.run(["playwright", "install", "chromium"], check=True, timeout=300)
+                print("[BruceLeads] Chromium browser installed successfully.")
+            except Exception as e:
+                print(f"[BruceLeads] Warning: Could not install Chromium automatically: {e}")
+                print("[BruceLeads] Run 'playwright install chromium' manually if scraping fails.")
+        except Exception as e:
+            print(f"[BruceLeads] Warning: Could not install Chromium automatically: {e}")
+            print("[BruceLeads] Run 'playwright install chromium' manually if scraping fails.")
+
+    # ── Pip requirements (source mode only) ──
+    if not is_frozen:
+        req_file = Path(__file__).parent / "requirements.txt"
+        if req_file.exists():
+            # Quick check: try importing a key dependency
+            try:
+                import fastapi
+                import playwright
+            except ImportError:
+                print("[BruceLeads] Installing Python dependencies...")
+                try:
+                    _sp.run(
+                        [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
+                        check=True,
+                        timeout=300,
+                    )
+                    print("[BruceLeads] Dependencies installed.")
+                except Exception as e:
+                    print(f"[BruceLeads] Warning: pip install failed: {e}")
+                    print("[BruceLeads] Run 'pip install -r requirements.txt' manually.")
 
 
 def ensure_data_dirs():
@@ -170,6 +236,11 @@ def main():
 if __name__ == "__main__":
     # Always set up Playwright browser path for frozen mode
     setup_playwright_env()
+
+    # Install dependencies (Playwright browsers, pip packages) if missing
+    # Skip for worker subprocesses — only the main app installs
+    if not (len(sys.argv) >= 3 and sys.argv[1] == "--worker"):
+        install_dependencies()
     
     # Support --worker mode for subprocess workers in frozen EXE
     if len(sys.argv) >= 3 and sys.argv[1] == "--worker":
