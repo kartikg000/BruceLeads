@@ -78,21 +78,25 @@ def install_dependencies():
         print("[BruceLeads] First run — installing Playwright Chromium browser...")
         print("[BruceLeads] This may take a minute, please wait...")
         try:
-            _sp.run(
-                [sys.executable, "-m", "playwright", "install", "chromium"],
-                check=True,
-                timeout=300,
-            )
+            if is_frozen:
+                # In frozen EXE, sys.executable is BruceLeads.exe — NOT Python.
+                # Using sys.executable would re-launch the app in an infinite loop.
+                # Instead, use Playwright's bundled driver (Node.js binary) directly.
+                from playwright._impl._driver import compute_driver_executable, get_driver_env
+                driver = compute_driver_executable()
+                _sp.run(
+                    [str(driver), "install", "chromium"],
+                    env=get_driver_env(),
+                    check=True,
+                    timeout=300,
+                )
+            else:
+                _sp.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    check=True,
+                    timeout=300,
+                )
             print("[BruceLeads] Chromium browser installed successfully.")
-        except FileNotFoundError:
-            # In frozen mode, playwright might not be available as a module
-            # Try using the playwright CLI directly
-            try:
-                _sp.run(["playwright", "install", "chromium"], check=True, timeout=300)
-                print("[BruceLeads] Chromium browser installed successfully.")
-            except Exception as e:
-                print(f"[BruceLeads] Warning: Could not install Chromium automatically: {e}")
-                print("[BruceLeads] Run 'playwright install chromium' manually if scraping fails.")
         except Exception as e:
             print(f"[BruceLeads] Warning: Could not install Chromium automatically: {e}")
             print("[BruceLeads] Run 'playwright install chromium' manually if scraping fails.")

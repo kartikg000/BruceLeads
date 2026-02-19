@@ -71,6 +71,8 @@ pyinstaller --noconfirm --onedir --console --clean ^
     --hidden-import "multipart" ^
     --collect-submodules "uvicorn" ^
     --collect-submodules "fastapi" ^
+    --collect-submodules "playwright" ^
+    --collect-data "playwright" ^
     --exclude-module "PyQt5" ^
     --exclude-module "PyQt6" ^
     --exclude-module "PySide2" ^
