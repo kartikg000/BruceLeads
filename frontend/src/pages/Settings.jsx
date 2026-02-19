@@ -24,6 +24,7 @@ export default function Settings() {
     const [checkingUpdate, setCheckingUpdate] = useState(false)
     const [applyingUpdate, setApplyingUpdate] = useState(false)
     const [updateInfo, setUpdateInfo] = useState(null)
+    const [appVersion, setAppVersion] = useState(null)
 
     // Fetch settings from setup API
     const { data: setupSettings, refetch: refetchSettings } = useQuery({
@@ -203,7 +204,9 @@ export default function Settings() {
         try {
             const res = await axios.get('/api/update/check')
             setUpdateInfo(res.data)
-            if (!res.data.update_available) {
+            if (res.data.message) {
+                showNotification('info', res.data.message)
+            } else if (!res.data.update_available) {
                 showNotification('success', `You're on the latest version (v${res.data.current_version})`)
             }
         } catch (err) {
@@ -229,9 +232,9 @@ export default function Settings() {
         setApplyingUpdate(false)
     }
 
-    // Auto-check for updates on mount
+    // Fetch local version on mount (no network call)
     useEffect(() => {
-        axios.get('/api/update/check').then(res => setUpdateInfo(res.data)).catch(() => { })
+        axios.get('/api/update/version').then(res => setAppVersion(res.data.version)).catch(() => { })
     }, [])
 
     // Section card wrapper
@@ -551,7 +554,7 @@ export default function Settings() {
                         <div>
                             <p className="font-medium text-white">BruceLeads</p>
                             <p className="text-sm text-zinc-500">
-                                Version <span className="text-zinc-300 font-mono">{updateInfo?.current_version || '...'}</span>
+                                Version <span className="text-zinc-300 font-mono">{appVersion || '...'}</span>
                             </p>
                         </div>
                         <button

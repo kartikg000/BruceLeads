@@ -31,6 +31,13 @@ import config
 
 router = APIRouter()
 
+
+@router.get("/version")
+async def get_version():
+    """Return the current app version (no network call)."""
+    return {"version": config.APP_VERSION}
+
+
 # Trusted domains for update downloads
 _TRUSTED_DOWNLOAD_HOSTS = {
     "github.com",
@@ -101,12 +108,29 @@ async def check_for_update():
     Returns: { update_available, current_version, latest_version, download_url, release_notes }
     """
     api_url = f"https://api.github.com/repos/{config.GITHUB_REPO}/releases/latest"
+    headers = {"Accept": "application/vnd.github+json"}
+
+    # Try to use gh CLI token for higher rate limit
+    gh_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not gh_token:
+        try:
+            result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                gh_token = result.stdout.strip()
+        except Exception:
+            pass
+    if gh_token:
+        headers["Authorization"] = f"token {gh_token}"
+
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(api_url, headers={"Accept": "application/vnd.github+json"})
+            resp = await client.get(api_url, headers=headers)
         if resp.status_code == 404:
             return {"update_available": False, "current_version": config.APP_VERSION,
                     "latest_version": config.APP_VERSION, "message": "No releases found"}
+        if resp.status_code == 403:
+            return {"update_available": False, "current_version": config.APP_VERSION,
+                    "latest_version": config.APP_VERSION, "message": "GitHub API rate limited. Try again later."}
         resp.raise_for_status()
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Could not reach GitHub: {exc}")
