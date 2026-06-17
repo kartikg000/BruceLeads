@@ -199,9 +199,15 @@ def open_browser(port: int, delay: float = 2.5):
 
 def main():
     import uvicorn
+    import argparse
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='BruceLeads Application')
+    parser.add_argument('--port', type=int, default=8001, help='Port to run the application on')
+    args = parser.parse_args()
 
     host = "127.0.0.1"
-    port = 8000
+    port = args.port
     is_frozen = getattr(sys, 'frozen', False)
 
     ensure_data_dirs()
@@ -245,7 +251,7 @@ if __name__ == "__main__":
     # Skip for worker subprocesses — only the main app installs
     if not (len(sys.argv) >= 3 and sys.argv[1] == "--worker"):
         install_dependencies()
-    
+
     # Support --worker mode for subprocess workers in frozen EXE
     if len(sys.argv) >= 3 and sys.argv[1] == "--worker":
         # Run a worker script: BruceLeads.exe --worker <script> [args...]
