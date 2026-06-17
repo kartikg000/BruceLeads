@@ -177,16 +177,16 @@ GMAIL_TOKEN_FILE = CREDENTIALS_DIR / "gmail_token.json"
 # Scraping Configuration  (runtime-updatable)
 # =============================================================================
 def _scrape_min_delay():
-    return float(_resolve("scrape_min_delay", "SCRAPE_MIN_DELAY", "2"))
+    return float(_resolve("scrape_min_delay", "SCRAPE_MIN_DELAY", "1"))
 
 def _scrape_max_delay():
-    return float(_resolve("scrape_max_delay", "SCRAPE_MAX_DELAY", "5"))
+    return float(_resolve("scrape_max_delay", "SCRAPE_MAX_DELAY", "3"))
 
 def _max_leads():
     return int(_resolve("max_leads_per_session", "MAX_LEADS_PER_SESSION", "50"))
 
 def _max_concurrent_browsers():
-    return int(_resolve("max_concurrent_browsers", "MAX_CONCURRENT_BROWSERS", "10"))
+    return int(_resolve("max_concurrent_browsers", "MAX_CONCURRENT_BROWSERS", "15"))
 
 # Register dynamic scraping keys
 _DYNAMIC_KEYS.update({

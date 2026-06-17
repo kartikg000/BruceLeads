@@ -150,15 +150,9 @@ class EmailComposer:
         """
         framework = framework or config.DEFAULT_EMAIL_FRAMEWORK
         
-        # REQUIRE Gemini API key — no silent template fallback
+        # If Gemini is not configured, fall back to a static template generator
         if not self.model:
-            return EmailResult(
-                subject="",
-                body="",
-                framework=framework,
-                success=False,
-                error="Gemini API key is not set. Please add your Gemini API key in Settings to generate AI-powered emails."
-            )
+            return self._generate_with_template(lead, framework, custom_context, error_msg=None)
             
         # Build the prompt
         intent_signal = lead.intent_signal or "Local business"
@@ -201,14 +195,8 @@ class EmailComposer:
             )
             
         except Exception as e:
-            # Return error instead of silent template fallback
-            return EmailResult(
-                subject="",
-                body="",
-                framework=framework,
-                success=False,
-                error=f"Gemini AI generation failed: {str(e)}. Check your API key in Settings."
-            )
+            # On failure, fallback to the static template generator and include the error
+            return self._generate_with_template(lead, framework, custom_context, error_msg=str(e))
 
     def _generate_with_template(self, lead: Lead, framework: str, context: str, error_msg: str = None) -> EmailResult:
         """Generate email using static templates (fallback)."""

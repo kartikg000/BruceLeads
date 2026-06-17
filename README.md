@@ -34,7 +34,7 @@ Scrape high-intent leads from Google Maps & social media, enrich them with conta
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/yourusername/BruceLeads.git
+git clone https://github.com/kartikg000/BruceLeads.git
 cd BruceLeads
 
 # Create virtual environment

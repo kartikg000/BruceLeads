@@ -59,7 +59,7 @@ async def _extract_place(page, url: str, index: int, total: int) -> dict | None:
     try:
         print(f"Processing {index + 1}/{total}...", file=sys.stderr)
         await page.goto(url, wait_until='domcontentloaded', timeout=15000)
-        await asyncio.sleep(1.2)
+        await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
 
         lead_data = {"source": LeadSource.GOOGLE_MAPS.value}
 
@@ -250,7 +250,8 @@ async def scrape_google_maps(
         page = await context.new_page()
         print(f"Navigating to: {search_url}", file=sys.stderr)
         await page.goto(search_url, wait_until='load', timeout=45000)
-        await asyncio.sleep(3)
+        # Short pause after load — use runtime-configured scrape delays
+        await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
 
         # Accept cookies / consent banners
         try:
@@ -268,7 +269,7 @@ async def scrape_google_maps(
                 if await btn.count() > 0:
                     await btn.first.click()
                     print(f"Clicked consent button: {sel}", file=sys.stderr)
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
                     break
         except Exception:
             pass
@@ -303,7 +304,7 @@ async def scrape_google_maps(
                 continue
 
         if not feed_found:
-            await asyncio.sleep(3)
+            await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
             # Last check for any feed content
             for sel in feed_selectors:
                 if await page.locator(sel).count() > 0:
@@ -322,7 +323,7 @@ async def scrape_google_maps(
                 await browser.close()
                 return {"success": False, "leads": [], "errors": errors, "total_found": 0}
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
 
         # Scroll the feed to load more results
         try:
@@ -333,7 +334,7 @@ async def scrape_google_maps(
                 stall_count = 0
                 for i in range(scroll_count):
                     await container.evaluate('node => node.scrollTop = node.scrollHeight')
-                    await asyncio.sleep(1.2)
+                    await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
                     
                     # Count listing items in the feed
                     cur_items = await page.locator(f'{feed_selector_used} > div > div > a, {feed_selector_used} > div > a').count()
@@ -386,7 +387,7 @@ async def scrape_google_maps(
                             return await _extract_place(tab, url, idx, total)
                         finally:
                             await tab.close()
-                            await asyncio.sleep(random.uniform(0.2, 0.6))
+                            await asyncio.sleep(random.uniform(max(0.1, config.SCRAPE_MIN_DELAY/5), max(0.3, config.SCRAPE_MIN_DELAY/2)))
 
                 results = await asyncio.gather(
                     *[_tab_task(i, u) for i, u in enumerate(unique_urls)]
@@ -475,11 +476,11 @@ async def scrape_google_maps(
                 # Scroll element into view, then click
                 try:
                     await el.scroll_into_view_if_needed()
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(random.uniform(max(0.05, config.SCRAPE_MIN_DELAY/10), max(0.3, config.SCRAPE_MIN_DELAY/3)))
                 except Exception:
                     pass
                 await el.click()
-                await asyncio.sleep(2)
+                await asyncio.sleep(random.uniform(config.SCRAPE_MIN_DELAY, config.SCRAPE_MAX_DELAY))
 
                 # Wait for the detail panel h1 to appear (and be different from previous)
                 detail_ready = False
@@ -493,11 +494,11 @@ async def scrape_google_maps(
                                 break
                     except Exception:
                         pass
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(random.uniform(max(0.1, config.SCRAPE_MIN_DELAY/5), max(0.5, config.SCRAPE_MIN_DELAY/2)))
                 
                 if not detail_ready:
                     # Maybe the panel loaded but name didn't change (same name listing)
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(random.uniform(max(0.2, config.SCRAPE_MIN_DELAY/4), max(0.8, config.SCRAPE_MIN_DELAY)))
 
                 # Extract data from the panel
                 result = await _extract_from_panel(page)
@@ -526,19 +527,19 @@ async def scrape_google_maps(
                     await page.keyboard.press('Escape')
                 
                 # Wait for the feed to be visible again before next click
-                await asyncio.sleep(1)
+                await asyncio.sleep(random.uniform(max(0.2, config.SCRAPE_MIN_DELAY/4), max(0.8, config.SCRAPE_MIN_DELAY)))
                 try:
                     await page.wait_for_selector(feed_selector_used, timeout=4000)
                 except PlaywrightTimeout:
                     # Feed might still be there, just try continuing
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(random.uniform(max(0.2, config.SCRAPE_MIN_DELAY/4), max(0.8, config.SCRAPE_MIN_DELAY)))
 
             except Exception as e:
                 print(f"  Error on listing {i + 1}: {str(e)[:80]}", file=sys.stderr)
                 # Try to recover
                 try:
                     await page.keyboard.press('Escape')
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(random.uniform(max(0.2, config.SCRAPE_MIN_DELAY/4), max(0.8, config.SCRAPE_MIN_DELAY)))
                 except Exception:
                     pass
 
