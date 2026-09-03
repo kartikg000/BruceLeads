@@ -36,6 +36,90 @@ _MAX_LOCATION_LEN = 200
 _ALLOWED_PLATFORMS = {"linkedin", "twitter", "reddit", "instagram", "facebook"}
 
 
+def _run_maps_scrape(request: ScrapeRequest, db: LeadsDatabase):
+    scraper = GoogleMapsScraper(
+        headless=request.headless,
+        max_results=request.max_results
+    )
+    result = scraper.search_sync(request.query, request.location)
+
+    if not result.success:
+        return {
+            "status": "error",
+            "leads_found": 0,
+            "message": ", ".join(result.errors),
+        }
+
+    lead_ids = []
+    for lead in result.leads:
+        db.add_lead(lead)
+        lead_ids.append(lead.id)
+
+    if request.auto_enrich and result.leads:
+        enricher = LeadEnricher(
+            headless=request.headless,
+            use_google_search=request.use_google_search
+        )
+        enriched = enricher.enrich_leads_sync(result.leads)
+        for lead in enriched:
+            db.update_lead(lead)
+
+    return {
+        "status": "success",
+        "leads_found": len(lead_ids),
+        "lead_ids": lead_ids,
+        "message": f"Found {len(lead_ids)} leads",
+    }
+
+
+def _run_social_scrape(request: SocialScrapeRequest, db: LeadsDatabase):
+    from scrapers import SocialMediaScraper
+
+    scraper = SocialMediaScraper(
+        headless=request.headless,
+        max_results=request.max_results
+    )
+
+    all_leads = []
+    all_errors = []
+
+    for platform in request.platforms:
+        result = scraper.search_sync(request.query, platform)
+
+        if result.get('success'):
+            all_leads.extend(result.get('leads', []))
+
+        if result.get('errors'):
+            all_errors.extend([f"{platform}: {e}" for e in result.get('errors')])
+
+    lead_ids = []
+    for lead in all_leads:
+        db.add_lead(lead)
+        lead_ids.append(lead.id)
+
+    leads_found = len(lead_ids)
+
+    if request.auto_enrich and all_leads:
+        try:
+            enricher = LeadEnricher(
+                headless=request.headless,
+                use_google_search=request.use_google_search
+            )
+            enriched = enricher.enrich_leads_sync(all_leads)
+            for lead in enriched:
+                db.update_lead(lead)
+        except Exception as e:
+            all_errors.append(f"Enrichment error: {str(e)}")
+
+    return {
+        "status": "success" if leads_found > 0 else "error",
+        "leads_found": leads_found,
+        "lead_ids": lead_ids,
+        "errors": all_errors,
+        "message": f"Found {leads_found} leads across {len(request.platforms)} platforms",
+    }
+
+
 @router.post("/start")
 async def start_scrape(request: ScrapeRequest, background_tasks: BackgroundTasks, db: LeadsDatabase = Depends(get_db)):
     """Start a Google Maps scraping job."""
@@ -49,43 +133,8 @@ async def start_scrape(request: ScrapeRequest, background_tasks: BackgroundTasks
     if not 1 <= request.max_results <= 100:
         return {"status": "error", "leads_found": 0, "message": "max_results must be 1-100"}
 
-    scraper = GoogleMapsScraper(
-        headless=request.headless,
-        max_results=request.max_results
-    )
-    
-    # Run scraping synchronously for simpler response
     try:
-        result = scraper.search_sync(request.query, request.location)
-        
-        if result.success:
-            lead_ids = []
-            for lead in result.leads:
-                db.add_lead(lead)
-                lead_ids.append(lead.id)
-            
-            # Auto-enrich if requested
-            if request.auto_enrich and result.leads:
-                enricher = LeadEnricher(
-                    headless=request.headless,
-                    use_google_search=request.use_google_search
-                )
-                enriched = enricher.enrich_leads_sync(result.leads)
-                for lead in enriched:
-                    db.update_lead(lead)
-            
-            return {
-                "status": "success", 
-                "leads_found": len(lead_ids),
-                "lead_ids": lead_ids,
-                "message": f"Found {len(lead_ids)} leads"
-            }
-        else:
-            return {
-                "status": "error",
-                "leads_found": 0,
-                "message": ", ".join(result.errors)
-            }
+        return await asyncio.to_thread(_run_maps_scrape, request, db)
     except Exception as e:
         return {
             "status": "error",
@@ -107,55 +156,8 @@ async def start_social_scrape(request: SocialScrapeRequest, background_tasks: Ba
     if not 1 <= request.max_results <= 100:
         return {"status": "error", "leads_found": 0, "message": "max_results must be 1-100"}
 
-    from scrapers import SocialMediaScraper
-    
     try:
-        scraper = SocialMediaScraper(
-            headless=request.headless,
-            max_results=request.max_results
-        )
-        
-        all_leads = []
-        all_errors = []
-        
-        for platform in request.platforms:
-            result = scraper.search_sync(request.query, platform)
-            
-            if result.get('success'):
-                platform_leads = result.get('leads', [])
-                all_leads.extend(platform_leads)
-            
-            if result.get('errors'):
-                all_errors.extend([f"{platform}: {e}" for e in result.get('errors')])
-        
-        # Save to database
-        lead_ids = []
-        for lead in all_leads:
-            db.add_lead(lead)
-            lead_ids.append(lead.id)
-        
-        leads_found = len(lead_ids)
-        
-        # Auto-enrich if requested (find emails/owner from websites)
-        if request.auto_enrich and all_leads:
-            try:
-                enricher = LeadEnricher(
-                    headless=request.headless,
-                    use_google_search=request.use_google_search
-                )
-                enriched = enricher.enrich_leads_sync(all_leads)
-                for lead in enriched:
-                    db.update_lead(lead)
-            except Exception as e:
-                all_errors.append(f"Enrichment error: {str(e)}")
-        
-        return {
-            "status": "success" if leads_found > 0 else "error",
-            "leads_found": leads_found,
-            "lead_ids": lead_ids,
-            "errors": all_errors,
-            "message": f"Found {leads_found} leads across {len(request.platforms)} platforms"
-        }
+        return await asyncio.to_thread(_run_social_scrape, request, db)
     except Exception as e:
         return {
             "status": "error",

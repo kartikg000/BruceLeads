@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import axios from 'axios'
 import clsx from 'clsx'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import LeadTable from '../components/LeadTable'
 
 export default function ManageLeads() {
@@ -140,23 +140,45 @@ export default function ManageLeads() {
         showNotification('success', `Exported ${leads.length} leads to CSV!`)
     }
 
-    const handleExportExcel = () => {
-        const data = leads.map(l => ({
-            'Business Name': l.business_name || '',
-            'Owner': l.owner_name || '',
-            'Email': l.email || '',
-            'Phone': l.phone || '',
-            'Website': l.website || '',
-            'Address': l.address || '',
-            'Source': l.source || '',
-            'Status': l.status || '',
-            'Intent Score': l.intent_score || 0
-        }))
+    const handleExportExcel = async () => {
+        const workbook = new ExcelJS.Workbook()
+        const worksheet = workbook.addWorksheet('Leads')
+        worksheet.columns = [
+            { header: 'Business Name', key: 'business_name', width: 30 },
+            { header: 'Owner', key: 'owner_name', width: 20 },
+            { header: 'Email', key: 'email', width: 28 },
+            { header: 'Phone', key: 'phone', width: 18 },
+            { header: 'Website', key: 'website', width: 28 },
+            { header: 'Address', key: 'address', width: 32 },
+            { header: 'Source', key: 'source', width: 16 },
+            { header: 'Status', key: 'status', width: 14 },
+            { header: 'Intent Score', key: 'intent_score', width: 14 },
+        ]
 
-        const ws = XLSX.utils.json_to_sheet(data)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Leads')
-        XLSX.writeFile(wb, `bruce_leads_${scope}_${new Date().toISOString().split('T')[0]}.xlsx`)
+        leads.forEach((l) => {
+            worksheet.addRow({
+                business_name: l.business_name || '',
+                owner_name: l.owner_name || '',
+                email: l.email || '',
+                phone: l.phone || '',
+                website: l.website || '',
+                address: l.address || '',
+                source: l.source || '',
+                status: l.status || '',
+                intent_score: l.intent_score || 0,
+            })
+        })
+
+        const buffer = await workbook.xlsx.writeBuffer()
+        const blob = new Blob([buffer], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `bruce_leads_${scope}_${new Date().toISOString().split('T')[0]}.xlsx`
+        link.click()
+        URL.revokeObjectURL(url)
         showNotification('success', `Exported ${leads.length} leads to Excel!`)
     }
 

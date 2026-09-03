@@ -206,7 +206,7 @@ def main():
     parser.add_argument('--port', type=int, default=8001, help='Port to run the application on')
     args = parser.parse_args()
 
-    host = "127.0.0.2"
+    host = "127.0.0.1"
     port = args.port
     is_frozen = getattr(sys, 'frozen', False)
 
@@ -230,7 +230,7 @@ def main():
         # Development mode
         from backend.main import app
 
-        # Mount the built frontend if available (enables localhost:8000 for full-stack dev)
+        # Serve the built frontend and API together on the same port.
         mount_static_frontend(app)
 
         print(f"[BruceLeads] Dev server starting on http://localhost:{port}")

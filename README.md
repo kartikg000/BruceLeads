@@ -45,23 +45,21 @@ venv\Scripts\activate        # Windows
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install Playwright browsers
+# Install Playwright browsers (required for scraping/enrichment)
 playwright install chromium
 ```
 
 ### 2. Start the App
 
 ```bash
-# Terminal 1 — Backend
-python run_app.py
-
-# Terminal 2 — Frontend
 cd frontend
 npm install
-npm run dev
+npm run build
+cd ..
+python run_app.py
 ```
 
-Open **http://localhost:5173** in your browser. The **Setup Wizard** will guide you through configuring your API keys on first launch.
+Open **http://localhost:8001** in your browser. FastAPI serves both the API and the built React app on this single port. The **Setup Wizard** will guide you through configuring your API keys on first launch.
 
 ### 3. (Optional) Environment File
 
@@ -240,14 +238,23 @@ To distribute: zip the `dist/BruceLeads/` folder. Recipients just run `BruceLead
 ## 🛠️ Development
 
 ```bash
-# Backend (auto-reloads)
-python run_app.py
+# Terminal 1 — rebuild the frontend when files change (no extra web port)
+cd frontend
+npm run dev
 
-# Frontend (hot reload)
-cd frontend && npm run dev
+# Terminal 2 — serve the frontend and API together
+python run_app.py
 ```
 
-The Vite dev server proxies `/api`, `/stats`, `/config` to `localhost:8000`.
+Open **http://localhost:8001**. The frontend watcher updates `frontend/dist`; refresh the browser to see changes.
+
+### Tests
+
+```bash
+pip install pytest
+python -m pytest tests/test_flows.py -v
+python scripts/check_import.py
+```
 
 ---
 

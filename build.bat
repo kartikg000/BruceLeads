@@ -61,7 +61,7 @@ pyinstaller --noconfirm --onedir --console --clean ^
     --hidden-import "uvicorn.lifespan.on" ^
     --hidden-import "uvicorn.lifespan.off" ^
     --hidden-import "fastapi" ^
-    --hidden-import "google.generativeai" ^
+    --hidden-import "google.genai" ^
     --hidden-import "google.auth" ^
     --hidden-import "google.auth.transport.requests" ^
     --hidden-import "google_auth_oauthlib" ^

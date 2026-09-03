@@ -76,11 +76,14 @@ def save_gemini_key(body: GeminiSetup):
 
     # Quick validation: try to configure the SDK
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        # Fire a tiny request to validate the key
-        model.generate_content("Say OK", generation_config={"max_output_tokens": 5})
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=key)
+        client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents="Say OK",
+            config=types.GenerateContentConfig(max_output_tokens=5),
+        )
     except Exception as e:
         err = str(e)
         if "API_KEY_INVALID" in err or "INVALID" in err.upper():
@@ -150,68 +153,30 @@ def mark_setup_complete():
 # ─── Playwright Management ────────────────────────────────────
 
 def _check_playwright_chromium() -> bool:
-    """Check if Playwright Chromium browser is installed."""
+    """Verify Chromium can actually launch (includes headless shell)."""
     try:
-        # Check if the chromium executable exists via playwright's registry
-        result = subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "--dry-run", "chromium"],
-            capture_output=True, text=True, timeout=15
-        )
-        # If dry-run doesn't exist in this version, try checking directly
-        if result.returncode != 0:
-            # Fallback: try to import and check
-            try:
-                from playwright.sync_api import sync_playwright
-                p = sync_playwright().start()
-                try:
-                    browser = p.chromium.launch(headless=True)
-                    browser.close()
-                    p.stop()
-                    return True
-                except Exception:
-                    p.stop()
-                    return False
-            except Exception:
-                return False
-        return True
-    except Exception:
-        # Another fallback: check common install paths
+        from playwright.sync_api import sync_playwright
+        playwright = sync_playwright().start()
         try:
-            result = subprocess.run(
-                [sys.executable, "-m", "playwright", "install", "--help"],
-                capture_output=True, text=True, timeout=10
-            )
-            # If playwright module exists, check if chromium is there
-            if result.returncode == 0:
-                # Try browsers path
-                import pathlib
-                browsers_path = pathlib.Path.home() / "AppData" / "Local" / "ms-playwright"
-                if browsers_path.exists():
-                    chromium_dirs = list(browsers_path.glob("chromium-*"))
-                    return len(chromium_dirs) > 0
-            return False
-        except Exception:
-            return False
+            browser = playwright.chromium.launch(headless=True)
+            browser.close()
+            return True
+        finally:
+            playwright.stop()
+    except Exception:
+        return False
 
 
 @router.get("/playwright-status")
 def playwright_status():
     """Check if Playwright and Chromium are available."""
     try:
-        # Check if playwright module is installed
-        import playwright
+        import playwright  # noqa: F401
         pw_installed = True
     except ImportError:
         pw_installed = False
 
-    chromium_installed = False
-    if pw_installed:
-        # Check common Playwright browser path
-        import pathlib
-        browsers_path = pathlib.Path.home() / "AppData" / "Local" / "ms-playwright"
-        if browsers_path.exists():
-            chromium_dirs = list(browsers_path.glob("chromium-*"))
-            chromium_installed = len(chromium_dirs) > 0
+    chromium_installed = _check_playwright_chromium() if pw_installed else False
 
     return {
         "playwright_installed": pw_installed,

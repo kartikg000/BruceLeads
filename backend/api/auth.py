@@ -65,7 +65,7 @@ def has_credentials():
 
 
 @router.get("/login-url")
-def get_login_url(redirect: str = "http://localhost:8000"):
+def get_login_url(redirect: str = "http://localhost:8001"):
     """Generate a Google OAuth consent URL."""
     # Validate redirect URL to prevent open-redirect attacks
     try:
@@ -89,7 +89,7 @@ def get_login_url(redirect: str = "http://localhost:8000"):
     flow = Flow.from_client_secrets_file(
         str(config.GMAIL_CREDENTIALS_FILE),
         scopes=SCOPES,
-        redirect_uri="http://localhost:8000/api/auth/callback",
+        redirect_uri="http://localhost:8001/api/auth/callback",
     )
     auth_url, state = flow.authorization_url(
         prompt="consent", access_type="offline"
@@ -101,15 +101,15 @@ def get_login_url(redirect: str = "http://localhost:8000"):
 @router.get("/callback")
 def auth_callback(code: str = None, error: str = None):
     """Handle the OAuth redirect from Google."""
-    redirect_base = _oauth_state.get("redirect", "http://localhost:8000")
+    redirect_base = _oauth_state.get("redirect", "http://localhost:8001")
 
     # Validate redirect_base before using it
     try:
         parsed = urlparse(redirect_base)
         if parsed.hostname not in _ALLOWED_REDIRECT_HOSTS:
-            redirect_base = "http://localhost:8000"
+            redirect_base = "http://localhost:8001"
     except Exception:
-        redirect_base = "http://localhost:8000"
+        redirect_base = "http://localhost:8001"
 
     if error:
         return RedirectResponse(f"{redirect_base}/?auth_error={error}")
@@ -123,7 +123,7 @@ def auth_callback(code: str = None, error: str = None):
     flow = Flow.from_client_secrets_file(
         str(config.GMAIL_CREDENTIALS_FILE),
         scopes=SCOPES,
-        redirect_uri="http://localhost:8000/api/auth/callback",
+        redirect_uri="http://localhost:8001/api/auth/callback",
     )
     flow.fetch_token(code=code)
 

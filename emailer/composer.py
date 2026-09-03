@@ -1,13 +1,11 @@
 """
 Email Composer Module
-Uses Gemini 1.5 Flash to generate personalized cold emails.
+Uses Gemini to generate personalized cold emails.
 """
 
 import re
 from typing import Optional, Tuple, List
 from dataclasses import dataclass
-
-import google.generativeai as genai
 
 import config
 from models import Lead, LeadStatus
@@ -26,7 +24,7 @@ class EmailResult:
 
 class EmailComposer:
     """
-    Generates personalized cold emails using Gemini 1.5 Flash.
+    Generates personalized cold emails using Gemini.
     """
     
     # Spam trigger words to check for
@@ -63,12 +61,10 @@ class EmailComposer:
         self.sender_name = sender_name
         self.service_description = service_description or DEFAULT_SERVICE
         
-        # Initialize Gemini
+        self.client = None
         if self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-        else:
-            self.model = None
+            from google import genai
+            self.client = genai.Client(api_key=self.api_key)
     
     def _parse_email_response(self, response: str) -> Tuple[str, str]:
         """
@@ -151,7 +147,7 @@ class EmailComposer:
         framework = framework or config.DEFAULT_EMAIL_FRAMEWORK
         
         # If Gemini is not configured, fall back to a static template generator
-        if not self.model:
+        if not self.client:
             return self._generate_with_template(lead, framework, custom_context, error_msg=None)
             
         # Build the prompt
@@ -171,13 +167,14 @@ class EmailComposer:
         )
         
         try:
-            # Generate email
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            from google.genai import types
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=self.temperature,
-                    max_output_tokens=500
-                )
+                    max_output_tokens=500,
+                ),
             )
             
             # Parse response
